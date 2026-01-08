@@ -101,27 +101,39 @@ function Dashboard() {
             <p className="text-slate mt-1">Manage your export shipments and invoices</p>
           </div>
           <div className="flex space-x-3">
+            {/* GSTR-1 Button - Pro Feature */}
             <button
-              onClick={async () => {
-                try {
-                  const response = await axios.get(`${API_URL}/api/reports/gstr1-export`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                    responseType: 'blob'
-                  });
-                  const url = window.URL.createObjectURL(new Blob([response.data]));
-                  const link = document.createElement('a');
-                  link.href = url;
-                  link.setAttribute('download', 'gstr1_export_data.csv');
-                  document.body.appendChild(link);
-                  link.click();
-                  link.remove();
-                } catch (err) {
-                  console.error('Error downloading GSTR-1:', err);
+              onClick={() => {
+                if (!isProMember) {
+                  setShowUpgradeModal(true);
+                  return;
                 }
+                (async () => {
+                  try {
+                    const response = await axios.get(`${API_URL}/api/reports/gstr1-export`, {
+                      headers: { Authorization: `Bearer ${token}` },
+                      responseType: 'blob'
+                    });
+                    const url = window.URL.createObjectURL(new Blob([response.data]));
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.setAttribute('download', 'gstr1_export_data.csv');
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                  } catch (err) {
+                    console.error('Error downloading GSTR-1:', err);
+                  }
+                })();
               }}
-              className="flex items-center space-x-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-md"
+              className={`flex items-center space-x-2 px-4 py-3 rounded-lg transition-colors shadow-md ${
+                isProMember 
+                  ? 'bg-green-600 text-white hover:bg-green-700' 
+                  : 'bg-gray-400 text-white cursor-not-allowed'
+              }`}
               data-testid="gstr1-export-button"
             >
+              {!isProMember && <Lock className="w-4 h-4" />}
               <FileText className="w-5 h-5" />
               <span className="font-medium">Download GSTR-1 Data</span>
             </button>
@@ -133,6 +145,16 @@ function Dashboard() {
               <Plus className="w-5 h-5" />
               <span className="font-medium">New Shipment</span>
             </button>
+            {!isProMember && (
+              <button
+                onClick={() => navigate('/upgrade')}
+                className="flex items-center space-x-2 px-4 py-3 bg-yellow-500 text-navy rounded-lg hover:bg-yellow-400 transition-colors shadow-md font-bold"
+                data-testid="upgrade-cta-button"
+              >
+                <Crown className="w-5 h-5" />
+                <span>Upgrade to Pro</span>
+              </button>
+            )}
           </div>
         </div>
 
