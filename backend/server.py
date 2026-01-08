@@ -213,7 +213,8 @@ async def create_shipment(
     buyer_address: str = Form(""),
     po_number: str = Form(...),
     po_date: str = Form(...),
-    items: str = Form(...)  # JSON string
+    items: str = Form(...),  # JSON string
+    currency: str = Form("USD")  # Default to USD
 ):
     items_list = json.loads(items)
     
@@ -225,6 +226,7 @@ async def create_shipment(
         "buyer_address": buyer_address,
         "po_number": po_number,
         "po_date": po_date,
+        "currency": currency,
         "status": "Draft",
         "items": items_list,
         "created_at": datetime.utcnow()
