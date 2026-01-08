@@ -173,6 +173,10 @@ function NewShipment() {
       setStep(4); // Success step
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to generate invoice');
+      if (err.response?.status === 401) {
+        localStorage.clear();
+        navigate('/login');
+      }
     } finally {
       setGenerating(false);
     }
