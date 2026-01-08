@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Plus, Settings as SettingsIcon, LogOut, FileText, Calendar, User } from 'lucide-react';
+import { Package, Plus, Settings as SettingsIcon, LogOut, FileText, Calendar, User, Lock, Crown } from 'lucide-react';
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -8,8 +8,10 @@ const API_URL = process.env.REACT_APP_BACKEND_URL;
 function Dashboard() {
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
+  const isProMember = localStorage.getItem('is_pro_member') === 'true';
 
   const checkProfile = useCallback(async () => {
     try {
