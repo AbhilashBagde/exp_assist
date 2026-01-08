@@ -80,7 +80,6 @@ function NewShipment() {
         }
       });
 
-      setExtractedData(response.data);
       setFormData(response.data);
       setStep(3); // Move to Step C (Review Form)
     } catch (err) {
