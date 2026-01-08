@@ -12,6 +12,7 @@ import json
 import base64
 import io
 from pathlib import Path
+from dotenv import load_dotenv
 import google.generativeai as genai
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.lib import colors
@@ -22,6 +23,9 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from PIL import Image as PILImage
 from pdf2image import convert_from_bytes
 import uuid
+
+# Load environment variables
+load_dotenv()
 
 app = FastAPI()
 
