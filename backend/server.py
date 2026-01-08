@@ -353,6 +353,10 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
     if not shipment:
         raise HTTPException(status_code=404, detail="Shipment not found")
     
+    # FEATURE 2: Recalculate all totals before generating PDF
+    for item in shipment['items']:
+        item['total_amount'] = item['quantity'] * item['unit_price']
+    
     # Get company profile
     profile = profiles_collection.find_one({"user_id": user_id})
     if not profile:
