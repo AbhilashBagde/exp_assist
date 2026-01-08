@@ -81,7 +81,13 @@ function NewShipment() {
         }
       });
 
-      setFormData(response.data);
+      // Map currency_code from AI to currency field
+      const extractedData = response.data;
+      if (extractedData.currency_code) {
+        extractedData.currency = extractedData.currency_code;
+      }
+
+      setFormData(extractedData);
       setStep(3); // Move to Step C (Review Form)
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to extract data from document');
