@@ -15,6 +15,7 @@ function NewShipment() {
     buyer_address: '',
     po_number: '',
     po_date: '',
+    currency: 'USD',
     items: []
   });
   const [generating, setGenerating] = useState(false);
