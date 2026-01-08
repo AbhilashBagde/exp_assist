@@ -112,7 +112,26 @@ async def login(email: str = Form(...), password: str = Form(...)):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     token = create_token(user["_id"])
-    return {"token": token, "user_id": user["_id"], "email": user["email"]}
+    return {
+        "token": token, 
+        "user_id": user["_id"], 
+        "email": user["email"],
+        "is_pro_member": user.get("is_pro_member", False)
+    }
+
+# Get User Info (including pro status)
+@app.get("/api/user/me")
+async def get_user_info(user_id: str = Depends(verify_token)):
+    user = users_collection.find_one({"_id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {
+        "user_id": user["_id"],
+        "email": user["email"],
+        "is_pro_member": user.get("is_pro_member", False),
+        "created_at": user["created_at"].isoformat()
+    }
 
 # Company Profile Endpoints
 @app.get("/api/profile")
