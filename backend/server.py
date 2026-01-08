@@ -408,123 +408,211 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
     pdf_filename = f"invoice_{shipment_id}.pdf"
     pdf_path = UPLOADS_DIR / pdf_filename
     
-    doc = SimpleDocTemplate(str(pdf_path), pagesize=A4)
+    doc = SimpleDocTemplate(str(pdf_path), pagesize=A4, 
+                           topMargin=0.5*inch, bottomMargin=0.5*inch,
+                           leftMargin=0.5*inch, rightMargin=0.5*inch)
     elements = []
     
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=18,
-        textColor=colors.HexColor('#0f172a'),
-        spaceAfter=30,
-        alignment=TA_CENTER
-    )
+    currency = shipment.get('currency', 'USD')
     
-    # Title
-    elements.append(Paragraph("COMMERCIAL INVOICE", title_style))
-    elements.append(Spacer(1, 0.3*inch))
-    
-    # Company Details
-    company_data = [
-        [Paragraph(f"<b>{profile['company_name']}</b>", styles['Normal'])],
-        [Paragraph(profile['address_line1'], styles['Normal'])],
+    # ========== ZONE 1: THE HEADER (Top Strip) ==========
+    header_data = [
+        [
+            Paragraph(f"<b>{profile['company_name']}</b>", ParagraphStyle(
+                'CompanyName', parent=styles['Normal'], fontSize=16, textColor=colors.HexColor('#0f172a')
+            )),
+            Paragraph("<b><u>COMMERCIAL INVOICE</u></b>", ParagraphStyle(
+                'Title', parent=styles['Heading1'], fontSize=16, 
+                textColor=colors.HexColor('#0f172a'), alignment=TA_CENTER
+            )),
+            Paragraph(f"<b>Invoice No:</b> {shipment['po_number']}<br/><b>Date:</b> {shipment['po_date']}", 
+                     ParagraphStyle('InvoiceBox', parent=styles['Normal'], fontSize=10,
+                                  borderWidth=1, borderColor=colors.black, borderPadding=8))
+        ]
     ]
-    if profile.get('address_line2'):
-        company_data.append([Paragraph(profile['address_line2'], styles['Normal'])])
-    company_data.extend([
-        [Paragraph(f"IEC: {profile['iec_code']} | GST: {profile['gst_number']}", styles['Normal'])],
-    ])
     
-    company_table = Table(company_data, colWidths=[6*inch])
-    company_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    header_table = Table(header_data, colWidths=[2.5*inch, 2.5*inch, 2.5*inch])
+    header_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+        ('ALIGN', (1, 0), (1, 0), 'CENTER'),
+        ('ALIGN', (2, 0), (2, 0), 'RIGHT'),
+        ('BOX', (2, 0), (2, 0), 1, colors.black),
+        ('BACKGROUND', (2, 0), (2, 0), colors.HexColor('#f0f0f0')),
     ]))
-    elements.append(company_table)
-    elements.append(Spacer(1, 0.3*inch))
-    
-    # Buyer Details
-    buyer_data = [
-        [Paragraph("<b>BUYER DETAILS:</b>", styles['Normal'])],
-        [Paragraph(shipment['buyer_name'], styles['Normal'])],
-    ]
-    if shipment.get('buyer_address'):
-        buyer_data.append([Paragraph(shipment['buyer_address'], styles['Normal'])])
-    
-    buyer_table = Table(buyer_data, colWidths=[6*inch])
-    buyer_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-    ]))
-    elements.append(buyer_table)
+    elements.append(header_table)
     elements.append(Spacer(1, 0.2*inch))
     
-    # Invoice Details
-    invoice_info = [
-        [Paragraph(f"<b>PO Number:</b> {shipment['po_number']}", styles['Normal']),
-         Paragraph(f"<b>PO Date:</b> {shipment['po_date']}", styles['Normal'])]
+    # ========== ZONE 2: THE PARTIES (Two Columns) ==========
+    exporter_text = f"<b>EXPORTER</b><br/>{profile['company_name']}<br/>{profile['address_line1']}"
+    if profile.get('address_line2'):
+        exporter_text += f"<br/>{profile['address_line2']}"
+    exporter_text += f"<br/><b>IEC:</b> {profile['iec_code']}<br/><b>GSTIN:</b> {profile['gst_number']}"
+    
+    consignee_text = f"<b>CONSIGNEE / BUYER</b><br/>{shipment['buyer_name']}"
+    if shipment.get('buyer_address'):
+        consignee_text += f"<br/>{shipment['buyer_address']}"
+    consignee_text += f"<br/><b>PO Number:</b> {shipment['po_number']}<br/><b>PO Date:</b> {shipment['po_date']}"
+    
+    parties_data = [
+        [
+            Paragraph(exporter_text, styles['Normal']),
+            Paragraph(consignee_text, styles['Normal'])
+        ]
     ]
-    invoice_table = Table(invoice_info, colWidths=[3*inch, 3*inch])
-    elements.append(invoice_table)
-    elements.append(Spacer(1, 0.3*inch))
     
-    # Items Table with Dynamic Currency Headers
-    currency = shipment.get('currency', 'USD')
-    items_data = [['Description', 'HS Code', 'Qty', f'Rate ({currency})', f'Amount ({currency})']]
+    parties_table = Table(parties_data, colWidths=[3.75*inch, 3.75*inch])
+    parties_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('BOX', (0, 0), (-1, -1), 1, colors.black),
+        ('LINEAFTER', (0, 0), (0, -1), 1, colors.black),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+    ]))
+    elements.append(parties_table)
+    elements.append(Spacer(1, 0.15*inch))
+    
+    # ========== ZONE 3: LOGISTICS STRIP ==========
+    logistics_headers = ['Country of Origin', 'Port of Loading', 'Port of Discharge', 'Incoterms']
+    logistics_values = [
+        'India',
+        shipment.get('port_of_loading', 'N/A'),
+        shipment.get('port_of_discharge', 'N/A'),
+        shipment.get('incoterms', 'FOB')
+    ]
+    
+    logistics_data = [logistics_headers, logistics_values]
+    logistics_table = Table(logistics_data, colWidths=[1.875*inch]*4)
+    logistics_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#d3d3d3')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+    ]))
+    elements.append(logistics_table)
+    elements.append(Spacer(1, 0.15*inch))
+    
+    # ========== ZONE 4: THE GOODS (Main Table) ==========
+    items_data = [[
+        Paragraph('<b>Description</b>', styles['Normal']),
+        Paragraph('<b>HS Code</b>', styles['Normal']),
+        Paragraph('<b>Qty</b>', styles['Normal']),
+        Paragraph(f'<b>Rate ({currency})</b>', styles['Normal']),
+        Paragraph(f'<b>Amount ({currency})</b>', styles['Normal'])
+    ]]
+    
     total_amount = 0
-    
     for item in shipment['items']:
         items_data.append([
             item['description'],
             item['hs_code'],
             str(item['quantity']),
-            f"{item['unit_price']:.2f}",  # Clean number, no symbol
-            f"{item['total_amount']:.2f}"  # Clean number, no symbol
+            f"{item['unit_price']:.2f}",
+            f"{item['total_amount']:,.2f}"
         ])
         total_amount += item['total_amount']
     
-    items_data.append(['', '', '', f'TOTAL ({currency}):', f"{total_amount:,.2f}"])  # Clean number with comma separator
-    
-    items_table = Table(items_data, colWidths=[2.5*inch, 1*inch, 0.8*inch, 1*inch, 1.2*inch])
+    items_table = Table(items_data, colWidths=[3*inch, 1*inch, 0.7*inch, 1.15*inch, 1.65*inch])
     items_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0f172a')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -2), colors.beige),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#e2e8f0')),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
     ]))
     elements.append(items_table)
-    elements.append(Spacer(1, 0.4*inch))
+    elements.append(Spacer(1, 0.1*inch))
     
-    # Bank Details
-    bank_data = [
-        [Paragraph("<b>BANK DETAILS:</b>", styles['Normal'])],
-        [Paragraph(f"Bank: {profile['bank_name']}", styles['Normal'])],
-        [Paragraph(f"Account No: {profile['account_number']}", styles['Normal'])],
-        [Paragraph(f"IFSC: {profile['ifsc_code']}", styles['Normal'])],
-    ]
+    # ========== ZONE 5: THE SUMMARY ==========
+    total_packages = shipment.get('total_packages', 1)
+    package_type = shipment.get('package_type', 'BOXES')
+    total_net_weight = sum(item.get('net_weight', 0) for item in shipment['items'])
+    total_gross_weight = sum(item.get('gross_weight', 0) for item in shipment['items'])
+    
+    summary_data = [[
+        Paragraph(f"<b>Total Packages:</b> {total_packages} {package_type}", styles['Normal']),
+        Paragraph(f"<b>Total Net Weight:</b> {total_net_weight:.2f} kg<br/>"
+                 f"<b>Total Gross Weight:</b> {total_gross_weight:.2f} kg<br/>"
+                 f"<b>TOTAL ({currency}):</b> {total_amount:,.2f}",
+                 ParagraphStyle('SummaryRight', parent=styles['Normal'], alignment=TA_RIGHT, fontName='Helvetica-Bold'))
+    ]]
+    
+    summary_table = Table(summary_data, colWidths=[3.75*inch, 3.75*inch])
+    summary_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]))
+    elements.append(summary_table)
+    elements.append(Spacer(1, 0.2*inch))
+    
+    # ========== ZONE 6: THE FOOTER (Banking & Auth) ==========
+    # Left Side: Banking Instructions
+    banking_text = f"<b>BANKING INSTRUCTIONS</b><br/>"
+    banking_text += f"<b>Bank Name:</b> {profile['bank_name']}<br/>"
+    banking_text += f"<b>Account No:</b> {profile['account_number']}<br/>"
+    banking_text += f"<b>IFSC Code:</b> {profile['ifsc_code']}"
     if profile.get('swift_code'):
-        bank_data.append([Paragraph(f"SWIFT: {profile['swift_code']}", styles['Normal'])])
+        banking_text += f"<br/><b>SWIFT Code:</b> {profile['swift_code']}"
+    banking_text += "<br/><br/><b>Declaration:</b> We hereby declare that the above information is true and correct and that the goods are of Indian origin."
     
-    bank_table = Table(bank_data, colWidths=[6*inch])
-    elements.append(bank_table)
-    elements.append(Spacer(1, 0.3*inch))
+    # Right Side: Signature Box
+    signature_elements = []
+    signature_elements.append(Paragraph(f"<b>For {profile['company_name']}</b>", 
+                                       ParagraphStyle('SigHeader', parent=styles['Normal'], 
+                                                    fontSize=10, alignment=TA_CENTER)))
+    signature_elements.append(Spacer(1, 0.1*inch))
     
-    # Signature
+    # Stamp Image Space (80px ~ 1.1 inches)
     if profile.get('signature_image_url'):
         sig_path = UPLOADS_DIR / profile['signature_image_url'].split('/')[-1]
         if sig_path.exists():
-            elements.append(Image(str(sig_path), width=2*inch, height=1*inch))
-            elements.append(Spacer(1, 0.1*inch))
+            signature_elements.append(Image(str(sig_path), width=1.8*inch, height=0.8*inch))
+        else:
+            signature_elements.append(Spacer(1, 0.8*inch))  # Placeholder if image not found
+    else:
+        signature_elements.append(Spacer(1, 0.8*inch))  # 80px space for stamp
     
-    elements.append(Paragraph("Authorized Signatory", styles['Normal']))
-    elements.append(Spacer(1, 0.3*inch))
+    signature_elements.append(Spacer(1, 0.05*inch))
+    signature_elements.append(Paragraph("Authorized Signatory", 
+                                       ParagraphStyle('SigFooter', parent=styles['Normal'], 
+                                                    fontSize=9, alignment=TA_CENTER)))
+    
+    # Combine signature elements into a single cell content
+    from reportlab.platypus import KeepTogether
+    signature_content = KeepTogether(signature_elements)
+    
+    footer_data = [[
+        Paragraph(banking_text, styles['Normal']),
+        signature_content
+    ]]
+    
+    footer_table = Table(footer_data, colWidths=[4.5*inch, 3*inch])
+    footer_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+        ('ALIGN', (1, 0), (1, 0), 'CENTER'),
+        ('BOX', (0, 0), (-1, -1), 1, colors.black),
+        ('LINEAFTER', (0, 0), (0, -1), 1, colors.black),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+    ]))
+    elements.append(footer_table)
+    elements.append(Spacer(1, 0.15*inch))
     
     # Compliance Text
     compliance_style = ParagraphStyle(
@@ -535,7 +623,7 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
         textColor=colors.grey
     )
     elements.append(Paragraph("Supply Meant for Export Under Bond/LUT", compliance_style))
-    elements.append(Spacer(1, 0.2*inch))
+    elements.append(Spacer(1, 0.1*inch))
     
     # Legal Disclaimer
     disclaimer_style = ParagraphStyle(
