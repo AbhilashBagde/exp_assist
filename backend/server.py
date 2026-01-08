@@ -670,6 +670,18 @@ async def generate_packing_list_pdf(shipment_id: str, user_id: str = Depends(ver
             elements.append(Spacer(1, 0.1*inch))
     
     elements.append(Paragraph("Authorized Signatory", styles['Normal']))
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Legal Disclaimer
+    disclaimer_style = ParagraphStyle(
+        'Disclaimer',
+        parent=styles['Normal'],
+        fontSize=8,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor('#808080')
+    )
+    disclaimer_text = "Disclaimer: This document is generated using AI assistance. The Exporter is solely responsible for verifying all data, including HS Codes and values, before submission to Customs. ExportAssist assumes no liability for errors or non-compliance."
+    elements.append(Paragraph(disclaimer_text, disclaimer_style))
     
     # Build PDF
     doc.build(elements)
