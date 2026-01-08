@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ENVELOPE>
+    <HEADER>
+        <TALLYREQUEST>Import Data</TALLYREQUEST>
+    </HEADER>
+    <BODY>
+        <IMPORTDATA>
+            <REQUESTDESC>
+                <REPORTNAME>Vouchers</REPORTNAME>
+            </REQUESTDESC>
+            <REQUESTDATA>
+                <TALLYMESSAGE xmlns:UDF="TallyUDF">
+                    <VOUCHER REMOTEID="" VCHKEY="" VCHTYPE="Sales" ACTION="Create" OBJVIEW="Invoice Voucher View">
+                        <DATE>20250108</DATE>
+                        <VOUCHERTYPENAME>Sales</VOUCHERTYPENAME>
+                        <VOUCHERNUMBER>PO-TEST-UPDATED</VOUCHERNUMBER>
+                        <PARTYLEDGERNAME>Global Imports LLC</PARTYLEDGERNAME>
+                        <EFFECTIVEDATE>20250108</EFFECTIVEDATE>
+                        <ISINVOICE>Yes</ISINVOICE>
+                        <ALLINVENTORYENTRIES.LIST>
+                            <STOCKITEMNAME>Basmati Rice Premium Grade</STOCKITEMNAME>
+                            <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+                            <RATE>25.50</RATE>
+                            <AMOUNT>-3825.00</AMOUNT>
+                            <ACTUALQTY>150</ACTUALQTY>
+                            <BILLEDQTY>150</BILLEDQTY>
+                        </ALLINVENTORYENTRIES.LIST>
+                        <ALLLEDGERENTRIES.LIST>
+                            <LEDGERNAME>Global Imports LLC</LEDGERNAME>
+                            <GSTCLASS/>
+                            <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+                            <AMOUNT>3825.00</AMOUNT>
+                        </ALLLEDGERENTRIES.LIST>
+                        <ALLLEDGERENTRIES.LIST>
+                            <LEDGERNAME>Export Sales</LEDGERNAME>
+                            <GSTCLASS/>
+                            <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
+                            <AMOUNT>-3825.00</AMOUNT>
+                        </ALLLEDGERENTRIES.LIST>
+                    </VOUCHER>
+                </TALLYMESSAGE>
+            </REQUESTDATA>
+        </IMPORTDATA>
+    </BODY>
+</ENVELOPE>
