@@ -234,7 +234,7 @@ class ExportAssistAPITester:
             "api/shipments",
             200,
             data=shipment_data,
-            headers={'Content-Type': 'application/x-www-form-urlencoded'}
+            form_data=True
         )
         
         if success and isinstance(response, dict) and 'shipment_id' in response:
