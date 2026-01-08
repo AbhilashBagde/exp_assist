@@ -5,6 +5,7 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import Settings from './components/Settings';
 import NewShipment from './components/NewShipment';
+import Upgrade from './components/Upgrade';
 
 function PrivateRoute({ children }) {
   const token = localStorage.getItem('token');
@@ -21,6 +22,7 @@ function App() {
           <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
           <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
           <Route path="/new-shipment" element={<PrivateRoute><NewShipment /></PrivateRoute>} />
+          <Route path="/upgrade" element={<PrivateRoute><Upgrade /></PrivateRoute>} />
           <Route path="/" element={<Navigate to="/dashboard" />} />
         </Routes>
       </div>
