@@ -254,58 +254,78 @@ function Dashboard() {
                                 📄 Invoice PDF
                               </a>
                             )}
+                            {/* Packing List - Pro Feature */}
                             <button
-                              onClick={async () => {
-                                try {
-                                  const response = await axios.post(
-                                    `${API_URL}/api/shipments/${shipment._id}/generate-packing-list`,
-                                    {},
-                                    {
-                                      headers: { Authorization: `Bearer ${token}` },
-                                      responseType: 'blob'
-                                    }
-                                  );
-                                  const url = window.URL.createObjectURL(new Blob([response.data]));
-                                  const link = document.createElement('a');
-                                  link.href = url;
-                                  link.setAttribute('download', `packing_list_${shipment._id}.pdf`);
-                                  document.body.appendChild(link);
-                                  link.click();
-                                  link.remove();
-                                } catch (err) {
-                                  console.error('Error downloading packing list:', err);
+                              onClick={() => {
+                                if (!isProMember) {
+                                  setShowUpgradeModal(true);
+                                  return;
                                 }
+                                (async () => {
+                                  try {
+                                    const response = await axios.post(
+                                      `${API_URL}/api/shipments/${shipment._id}/generate-packing-list`,
+                                      {},
+                                      {
+                                        headers: { Authorization: `Bearer ${token}` },
+                                        responseType: 'blob'
+                                      }
+                                    );
+                                    const url = window.URL.createObjectURL(new Blob([response.data]));
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.setAttribute('download', `packing_list_${shipment._id}.pdf`);
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    link.remove();
+                                  } catch (err) {
+                                    console.error('Error downloading packing list:', err);
+                                  }
+                                })();
                               }}
-                              className="text-blue-600 hover:text-blue-800 font-medium text-left"
+                              className={`font-medium text-left flex items-center ${
+                                isProMember ? 'text-blue-600 hover:text-blue-800' : 'text-gray-400 cursor-not-allowed'
+                              }`}
                               data-testid={`packing-list-${shipment._id}`}
                             >
+                              {!isProMember && <Lock className="w-3 h-3 mr-1" />}
                               📦 Packing List
                             </button>
+                            {/* Tally Export - Pro Feature */}
                             <button
-                              onClick={async () => {
-                                try {
-                                  const response = await axios.post(
-                                    `${API_URL}/api/shipments/${shipment._id}/export-tally`,
-                                    {},
-                                    {
-                                      headers: { Authorization: `Bearer ${token}` },
-                                      responseType: 'blob'
-                                    }
-                                  );
-                                  const url = window.URL.createObjectURL(new Blob([response.data]));
-                                  const link = document.createElement('a');
-                                  link.href = url;
-                                  link.setAttribute('download', `tally_export_${shipment._id}.xml`);
-                                  document.body.appendChild(link);
-                                  link.click();
-                                  link.remove();
-                                } catch (err) {
-                                  console.error('Error downloading Tally XML:', err);
+                              onClick={() => {
+                                if (!isProMember) {
+                                  setShowUpgradeModal(true);
+                                  return;
                                 }
+                                (async () => {
+                                  try {
+                                    const response = await axios.post(
+                                      `${API_URL}/api/shipments/${shipment._id}/export-tally`,
+                                      {},
+                                      {
+                                        headers: { Authorization: `Bearer ${token}` },
+                                        responseType: 'blob'
+                                      }
+                                    );
+                                    const url = window.URL.createObjectURL(new Blob([response.data]));
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.setAttribute('download', `tally_export_${shipment._id}.xml`);
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    link.remove();
+                                  } catch (err) {
+                                    console.error('Error downloading Tally XML:', err);
+                                  }
+                                })();
                               }}
-                              className="text-purple-600 hover:text-purple-800 font-medium text-left"
+                              className={`font-medium text-left flex items-center ${
+                                isProMember ? 'text-purple-600 hover:text-purple-800' : 'text-gray-400 cursor-not-allowed'
+                              }`}
                               data-testid={`tally-export-${shipment._id}`}
                             >
+                              {!isProMember && <Lock className="w-3 h-3 mr-1" />}
                               💼 Tally XML
                             </button>
                           </div>
