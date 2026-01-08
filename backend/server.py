@@ -433,8 +433,9 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
     elements.append(invoice_table)
     elements.append(Spacer(1, 0.3*inch))
     
-    # Items Table
-    items_data = [['Description', 'HS Code', 'Qty', 'Rate', 'Amount']]
+    # Items Table with Dynamic Currency Headers
+    currency = shipment.get('currency', 'USD')
+    items_data = [['Description', 'HS Code', 'Qty', f'Rate ({currency})', f'Amount ({currency})']]
     total_amount = 0
     
     for item in shipment['items']:
@@ -442,12 +443,12 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
             item['description'],
             item['hs_code'],
             str(item['quantity']),
-            f"₹{item['unit_price']:.2f}",
-            f"₹{item['total_amount']:.2f}"
+            f"{item['unit_price']:.2f}",  # Clean number, no symbol
+            f"{item['total_amount']:.2f}"  # Clean number, no symbol
         ])
         total_amount += item['total_amount']
     
-    items_data.append(['', '', '', 'TOTAL:', f"₹{total_amount:.2f}"])
+    items_data.append(['', '', '', f'TOTAL ({currency}):', f"{total_amount:,.2f}"])  # Clean number with comma separator
     
     items_table = Table(items_data, colWidths=[2.5*inch, 1*inch, 0.8*inch, 1*inch, 1.2*inch])
     items_table.setStyle(TableStyle([
