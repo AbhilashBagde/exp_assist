@@ -588,35 +588,42 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
         banking_text += f"<br/><b>SWIFT Code:</b> {profile['swift_code']}"
     banking_text += "<br/><br/><b>Declaration:</b> We hereby declare that the above information is true and correct and that the goods are of Indian origin."
     
-    # Right Side: Signature Box
-    signature_elements = []
-    signature_elements.append(Paragraph(f"<b>For {profile['company_name']}</b>", 
-                                       ParagraphStyle('SigHeader', parent=styles['Normal'], 
-                                                    fontSize=10, alignment=TA_CENTER)))
-    signature_elements.append(Spacer(1, 0.1*inch))
+    # Right Side: Signature Box - Build as nested table to avoid KeepTogether issues
+    sig_header = Paragraph(f"<b>For {profile['company_name']}</b>", 
+                          ParagraphStyle('SigHeader', parent=styles['Normal'], 
+                                       fontSize=10, alignment=TA_CENTER))
     
-    # Stamp Image Space (80px ~ 1.1 inches)
+    # Signature image or placeholder
     if profile.get('signature_image_url'):
         sig_path = UPLOADS_DIR / profile['signature_image_url'].split('/')[-1]
         if sig_path.exists():
-            signature_elements.append(Image(str(sig_path), width=1.8*inch, height=0.8*inch))
+            sig_image = Image(str(sig_path), width=1.8*inch, height=0.8*inch)
         else:
-            signature_elements.append(Spacer(1, 0.8*inch))  # Placeholder if image not found
+            sig_image = Spacer(1, 0.8*inch)
     else:
-        signature_elements.append(Spacer(1, 0.8*inch))  # 80px space for stamp
+        sig_image = Spacer(1, 0.8*inch)
     
-    signature_elements.append(Spacer(1, 0.05*inch))
-    signature_elements.append(Paragraph("Authorized Signatory", 
-                                       ParagraphStyle('SigFooter', parent=styles['Normal'], 
-                                                    fontSize=9, alignment=TA_CENTER)))
+    sig_footer = Paragraph("Authorized Signatory", 
+                          ParagraphStyle('SigFooter', parent=styles['Normal'], 
+                                       fontSize=9, alignment=TA_CENTER))
     
-    # Combine signature elements into a single cell content
-    from reportlab.platypus import KeepTogether
-    signature_content = KeepTogether(signature_elements)
+    # Create nested table for signature section
+    sig_table_data = [
+        [sig_header],
+        [sig_image],
+        [sig_footer]
+    ]
+    sig_table = Table(sig_table_data, colWidths=[2.8*inch])
+    sig_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]))
     
     footer_data = [[
         Paragraph(banking_text, styles['Normal']),
-        signature_content
+        sig_table
     ]]
     
     footer_table = Table(footer_data, colWidths=[4.5*inch, 3*inch])
