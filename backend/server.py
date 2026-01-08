@@ -508,9 +508,276 @@ async def serve_upload(filename: str):
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(str(file_path))
 
+# VERSION 2.0 FEATURES
+
+# FEATURE 1: Generate Packing List PDF
+@app.post("/api/shipments/{shipment_id}/generate-packing-list")
+async def generate_packing_list_pdf(shipment_id: str, user_id: str = Depends(verify_token)):
+    # Get shipment data
+    shipment = shipments_collection.find_one({"_id": shipment_id, "user_id": user_id})
+    if not shipment:
+        raise HTTPException(status_code=404, detail="Shipment not found")
+    
+    # Get company profile
+    profile = profiles_collection.find_one({"user_id": user_id})
+    if not profile:
+        raise HTTPException(status_code=404, detail="Company profile not found")
+    
+    # Create PDF
+    pdf_filename = f"packing_list_{shipment_id}.pdf"
+    pdf_path = UPLOADS_DIR / pdf_filename
+    
+    doc = SimpleDocTemplate(str(pdf_path), pagesize=A4)
+    elements = []
+    
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        textColor=colors.HexColor('#0f172a'),
+        spaceAfter=30,
+        alignment=TA_CENTER
+    )
+    
+    # Title
+    elements.append(Paragraph("PACKING LIST", title_style))
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Company Details
+    company_data = [
+        [Paragraph(f"<b>{profile['company_name']}</b>", styles['Normal'])],
+        [Paragraph(profile['address_line1'], styles['Normal'])],
+    ]
+    if profile.get('address_line2'):
+        company_data.append([Paragraph(profile['address_line2'], styles['Normal'])])
+    company_data.extend([
+        [Paragraph(f"IEC: {profile['iec_code']} | GST: {profile['gst_number']}", styles['Normal'])],
+    ])
+    
+    company_table = Table(company_data, colWidths=[6*inch])
+    company_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]))
+    elements.append(company_table)
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Buyer Details
+    buyer_data = [
+        [Paragraph("<b>BUYER DETAILS:</b>", styles['Normal'])],
+        [Paragraph(shipment['buyer_name'], styles['Normal'])],
+    ]
+    if shipment.get('buyer_address'):
+        buyer_data.append([Paragraph(shipment['buyer_address'], styles['Normal'])])
+    
+    buyer_table = Table(buyer_data, colWidths=[6*inch])
+    buyer_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]))
+    elements.append(buyer_table)
+    elements.append(Spacer(1, 0.2*inch))
+    
+    # Shipment Details
+    shipment_info = [
+        [Paragraph(f"<b>PO Number:</b> {shipment['po_number']}", styles['Normal']),
+         Paragraph(f"<b>PO Date:</b> {shipment['po_date']}", styles['Normal'])]]
+    shipment_table = Table(shipment_info, colWidths=[3*inch, 3*inch])
+    elements.append(shipment_table)
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Items Table (No prices, includes weights)
+    items_data = [['Description', 'Qty', 'Net Wt (kg)', 'Gross Wt (kg)']]
+    total_net_weight = 0
+    total_gross_weight = 0
+    
+    for item in shipment['items']:
+        net_wt = item.get('net_weight', 0)
+        gross_wt = item.get('gross_weight', 0)
+        items_data.append([
+            item['description'],
+            str(item['quantity']),
+            f"{net_wt:.2f}",
+            f"{gross_wt:.2f}"
+        ])
+        total_net_weight += net_wt
+        total_gross_weight += gross_wt
+    
+    items_data.append(['TOTAL:', '', f"{total_net_weight:.2f}", f"{total_gross_weight:.2f}"])
+    
+    items_table = Table(items_data, colWidths=[3*inch, 1*inch, 1.2*inch, 1.2*inch])
+    items_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0f172a')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -2), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#e2e8f0')),
+    ]))
+    elements.append(items_table)
+    elements.append(Spacer(1, 0.4*inch))
+    
+    # Signature
+    if profile.get('signature_image_url'):
+        sig_path = UPLOADS_DIR / profile['signature_image_url'].split('/')[-1]
+        if sig_path.exists():
+            elements.append(Image(str(sig_path), width=2*inch, height=1*inch))
+            elements.append(Spacer(1, 0.1*inch))
+    
+    elements.append(Paragraph("Authorized Signatory", styles['Normal']))
+    
+    # Build PDF
+    doc.build(elements)
+    
+    return FileResponse(str(pdf_path), media_type='application/pdf', filename=pdf_filename)
+
+# FEATURE 3: GST GSTR-1 Export
+@app.get("/api/reports/gstr1-export")
+async def export_gstr1_data(user_id: str = Depends(verify_token)):
+    # Get all finalized shipments
+    shipments = list(shipments_collection.find({"user_id": user_id, "status": "Final"}))
+    
+    # Generate CSV
+    import csv
+    from io import StringIO
+    
+    output = StringIO()
+    writer = csv.writer(output)
+    
+    # CSV Headers for GSTR-1 Table 6A
+    writer.writerow([
+        'Invoice Number',
+        'Invoice Date',
+        'Port Code',
+        'Total Value',
+        'Taxable Value',
+        'Integrated Tax Amount'
+    ])
+    
+    for shipment in shipments:
+        total_value = sum(item.get('total_amount', 0) for item in shipment.get('items', []))
+        writer.writerow([
+            shipment.get('po_number', ''),
+            shipment.get('po_date', ''),
+            'INNSA1',  # Default port code
+            f"{total_value:.2f}",
+            f"{total_value:.2f}",  # Assuming taxable value = total for exports
+            '0.00'  # Zero-rated exports
+        ])
+    
+    # Create response
+    output.seek(0)
+    from fastapi.responses import StreamingResponse
+    
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=gstr1_export_data.csv"}
+    )
+
+# FEATURE 4: Tally XML Export
+@app.post("/api/shipments/{shipment_id}/export-tally")
+async def export_tally_xml(shipment_id: str, user_id: str = Depends(verify_token)):
+    # Get shipment data
+    shipment = shipments_collection.find_one({"_id": shipment_id, "user_id": user_id})
+    if not shipment:
+        raise HTTPException(status_code=404, detail="Shipment not found")
+    
+    # Get company profile
+    profile = profiles_collection.find_one({"user_id": user_id})
+    if not profile:
+        raise HTTPException(status_code=404, detail="Company profile not found")
+    
+    # Get tally sales ledger name (default to "Export Sales")
+    tally_ledger = profile.get('tally_sales_ledger_name', 'Export Sales')
+    
+    # Convert date to YYYYMMDD format
+    from datetime import datetime as dt
+    try:
+        po_date_obj = dt.strptime(shipment['po_date'], '%Y-%m-%d')
+        tally_date = po_date_obj.strftime('%Y%m%d')
+    except:
+        tally_date = dt.now().strftime('%Y%m%d')
+    
+    # Calculate total amount
+    total_amount = sum(item.get('total_amount', 0) for item in shipment.get('items', []))
+    
+    # Build Tally XML
+    xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<ENVELOPE>
+    <HEADER>
+        <TALLYREQUEST>Import Data</TALLYREQUEST>
+    </HEADER>
+    <BODY>
+        <IMPORTDATA>
+            <REQUESTDESC>
+                <REPORTNAME>Vouchers</REPORTNAME>
+            </REQUESTDESC>
+            <REQUESTDATA>
+                <TALLYMESSAGE xmlns:UDF="TallyUDF">
+                    <VOUCHER REMOTEID="" VCHKEY="" VCHTYPE="Sales" ACTION="Create" OBJVIEW="Invoice Voucher View">
+                        <DATE>{tally_date}</DATE>
+                        <VOUCHERTYPENAME>Sales</VOUCHERTYPENAME>
+                        <VOUCHERNUMBER>{shipment['po_number']}</VOUCHERNUMBER>
+                        <PARTYLEDGERNAME>{shipment['buyer_name']}</PARTYLEDGERNAME>
+                        <EFFECTIVEDATE>{tally_date}</EFFECTIVEDATE>
+                        <ISINVOICE>Yes</ISINVOICE>
+"""
+    
+    # Add inventory entries
+    for item in shipment.get('items', []):
+        xml_content += f"""                        <ALLINVENTORYENTRIES.LIST>
+                            <STOCKITEMNAME>{item['description']}</STOCKITEMNAME>
+                            <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+                            <RATE>{item['unit_price']:.2f}</RATE>
+                            <AMOUNT>-{item['total_amount']:.2f}</AMOUNT>
+                            <ACTUALQTY>{item['quantity']}</ACTUALQTY>
+                            <BILLEDQTY>{item['quantity']}</BILLEDQTY>
+                        </ALLINVENTORYENTRIES.LIST>
+"""
+    
+    # Add ledger entries
+    xml_content += f"""                        <ALLLEDGERENTRIES.LIST>
+                            <LEDGERNAME>{shipment['buyer_name']}</LEDGERNAME>
+                            <GSTCLASS/>
+                            <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+                            <AMOUNT>{total_amount:.2f}</AMOUNT>
+                        </ALLLEDGERENTRIES.LIST>
+                        <ALLLEDGERENTRIES.LIST>
+                            <LEDGERNAME>{tally_ledger}</LEDGERNAME>
+                            <GSTCLASS/>
+                            <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
+                            <AMOUNT>-{total_amount:.2f}</AMOUNT>
+                        </ALLLEDGERENTRIES.LIST>
+                    </VOUCHER>
+                </TALLYMESSAGE>
+            </REQUESTDATA>
+        </IMPORTDATA>
+    </BODY>
+</ENVELOPE>"""
+    
+    # Save to file
+    xml_filename = f"tally_export_{shipment_id}.xml"
+    xml_path = UPLOADS_DIR / xml_filename
+    
+    with open(xml_path, 'w', encoding='utf-8') as f:
+        f.write(xml_content)
+    
+    return FileResponse(
+        str(xml_path),
+        media_type='application/xml',
+        filename=xml_filename,
+        headers={"Content-Disposition": f"attachment; filename={xml_filename}"}
+    )
+
 @app.get("/api/health")
 async def health_check():
-    return {"status": "healthy", "service": "ExportAssist API"}
+    return {"status": "healthy", "service": "ExportAssist API v2.0"}
 
 if __name__ == "__main__":
     import uvicorn
