@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Package, Plus, Settings as SettingsIcon, LogOut, FileText, Calendar, User } from 'lucide-react';
 import axios from 'axios';
