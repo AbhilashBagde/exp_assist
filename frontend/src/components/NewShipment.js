@@ -475,10 +475,10 @@ function NewShipment() {
                         <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Description</th>
                         <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase bg-yellow-50">HS Code ⚠️</th>
                         <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Qty</th>
-                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Rate (₹)</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Rate ({formData.currency})</th>
                         <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Net Wt (kg)</th>
                         <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Gross Wt (kg)</th>
-                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Amount (₹)</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Amount ({formData.currency})</th>
                         <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Action</th>
                       </tr>
                     </thead>
