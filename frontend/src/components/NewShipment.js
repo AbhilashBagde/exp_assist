@@ -558,7 +558,7 @@ function NewShipment() {
                             />
                           </td>
                           <td className={`px-2 py-3 font-medium text-sm ${hasMathMismatch ? 'bg-red-100 text-red-700' : ''}`} data-testid={`item-total-${index}`}>
-                            ₹{item.total_amount.toFixed(2)}
+                            {item.total_amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             {hasMathMismatch && (
                               <div className="text-xs text-red-600 mt-1">Math Mismatch!</div>
                             )}
