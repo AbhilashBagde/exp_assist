@@ -245,6 +245,7 @@ async def update_shipment(
     po_number: str = Form(...),
     po_date: str = Form(...),
     items: str = Form(...),
+    currency: str = Form("USD"),
     status: str = Form("Draft")
 ):
     items_list = json.loads(items)
@@ -256,6 +257,7 @@ async def update_shipment(
             "buyer_address": buyer_address,
             "po_number": po_number,
             "po_date": po_date,
+            "currency": currency,
             "items": items_list,
             "status": status,
             "updated_at": datetime.utcnow()
