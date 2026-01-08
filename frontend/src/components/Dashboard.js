@@ -8,30 +8,27 @@ const API_URL = process.env.REACT_APP_BACKEND_URL;
 function Dashboard() {
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [profileExists, setProfileExists] = useState(true);
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
 
-  useEffect(() => {
-    checkProfile();
-    fetchShipments();
-  }, []);
-
-  const checkProfile = async () => {
+  const checkProfile = useCallback(async () => {
     try {
       const response = await axios.get(`${API_URL}/api/profile`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!response.data.exists) {
-        setProfileExists(false);
         navigate('/settings');
       }
     } catch (err) {
       console.error('Error checking profile:', err);
+      if (err.response?.status === 401) {
+        localStorage.clear();
+        navigate('/login');
+      }
     }
-  };
+  }, [token, navigate]);
 
-  const fetchShipments = async () => {
+  const fetchShipments = useCallback(async () => {
     try {
       const response = await axios.get(`${API_URL}/api/shipments`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -39,10 +36,19 @@ function Dashboard() {
       setShipments(response.data);
     } catch (err) {
       console.error('Error fetching shipments:', err);
+      if (err.response?.status === 401) {
+        localStorage.clear();
+        navigate('/login');
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [token, navigate]);
+
+  useEffect(() => {
+    checkProfile();
+    fetchShipments();
+  }, [checkProfile, fetchShipments]);
 
   const handleLogout = () => {
     localStorage.clear();
