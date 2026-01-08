@@ -450,77 +450,109 @@ function NewShipment() {
                   <table className="min-w-full border border-gray-200" data-testid="items-table">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Description</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase bg-yellow-50">HS Code ⚠️</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Qty</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Rate (₹)</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Amount (₹)</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Action</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Description</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase bg-yellow-50">HS Code ⚠️</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Qty</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Rate (₹)</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Net Wt (kg)</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Gross Wt (kg)</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Amount (₹)</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Action</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {formData.items.map((item, index) => (
+                      {formData.items.map((item, index) => {
+                        // Feature 2: Math Validation
+                        const calculatedAmount = item.quantity * item.unit_price;
+                        const hasMathMismatch = Math.abs(calculatedAmount - item.total_amount) > 0.01;
+                        
+                        return (
                         <tr key={index} data-testid={`item-row-${index}`}>
-                          <td className="px-4 py-3">
+                          <td className="px-2 py-3">
                             <input
                               type="text"
                               value={item.description}
                               onChange={(e) => handleItemChange(index, 'description', e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-navy"
+                              className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-navy text-sm"
                               required
                               data-testid={`item-description-${index}`}
                             />
                           </td>
-                          <td className="px-4 py-3 bg-yellow-50">
+                          <td className="px-2 py-3 bg-yellow-50">
                             <input
                               type="text"
                               value={item.hs_code}
                               onChange={(e) => handleItemChange(index, 'hs_code', e.target.value)}
-                              className="w-full px-2 py-1 border-2 border-yellow-400 rounded focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                              className="w-full px-2 py-1 border-2 border-yellow-400 rounded focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm"
                               placeholder="Verify!"
                               required
                               data-testid={`item-hs-code-${index}`}
                             />
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-2 py-3">
                             <input
                               type="number"
                               value={item.quantity}
                               onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-navy"
+                              className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-navy text-sm"
                               required
                               min="0"
                               step="0.01"
                               data-testid={`item-quantity-${index}`}
                             />
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-2 py-3">
                             <input
                               type="number"
                               value={item.unit_price}
                               onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-navy"
+                              className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-navy text-sm"
                               required
                               min="0"
                               step="0.01"
                               data-testid={`item-unit-price-${index}`}
                             />
                           </td>
-                          <td className="px-4 py-3 font-medium" data-testid={`item-total-${index}`}>
-                            ₹{item.total_amount.toFixed(2)}
+                          <td className="px-2 py-3">
+                            <input
+                              type="number"
+                              value={item.net_weight || 0}
+                              onChange={(e) => handleItemChange(index, 'net_weight', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-navy text-sm"
+                              min="0"
+                              step="0.01"
+                              data-testid={`item-net-weight-${index}`}
+                            />
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-2 py-3">
+                            <input
+                              type="number"
+                              value={item.gross_weight || 0}
+                              onChange={(e) => handleItemChange(index, 'gross_weight', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-navy text-sm"
+                              min="0"
+                              step="0.01"
+                              data-testid={`item-gross-weight-${index}`}
+                            />
+                          </td>
+                          <td className={`px-2 py-3 font-medium text-sm ${hasMathMismatch ? 'bg-red-100 text-red-700' : ''}`} data-testid={`item-total-${index}`}>
+                            ₹{item.total_amount.toFixed(2)}
+                            {hasMathMismatch && (
+                              <div className="text-xs text-red-600 mt-1">Math Mismatch!</div>
+                            )}
+                          </td>
+                          <td className="px-2 py-3">
                             <button
                               type="button"
                               onClick={() => removeItem(index)}
-                              className="text-red-600 hover:text-red-800"
+                              className="text-red-600 hover:text-red-800 text-sm"
                               data-testid={`remove-item-${index}`}
                             >
                               Remove
                             </button>
                           </td>
                         </tr>
-                      ))}
+                      )})}
                     </tbody>
                   </table>
                 </div>
