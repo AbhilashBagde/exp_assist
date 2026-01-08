@@ -343,7 +343,8 @@ function NewShipment() {
                           buyer_address: '',
                           po_number: '',
                           po_date: '',
-                          items: [{ description: '', quantity: 0, unit_price: 0, hs_code: '', total_amount: 0 }]
+                          currency: 'USD',
+                          items: [{ description: '', quantity: 0, unit_price: 0, hs_code: '', total_amount: 0, net_weight: 0, gross_weight: 0 }]
                         });
                         setStep(3);
                       }}
