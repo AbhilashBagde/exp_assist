@@ -431,6 +431,26 @@ function NewShipment() {
                       data-testid="buyer-address-input"
                     />
                   </div>
+                  <div>
+                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                      Currency *
+                    </label>
+                    <select
+                      name="currency"
+                      value={formData.currency}
+                      onChange={handleFormChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                      required
+                      data-testid="currency-select"
+                    >
+                      <option value="USD">USD - US Dollar</option>
+                      <option value="EUR">EUR - Euro</option>
+                      <option value="GBP">GBP - British Pound</option>
+                      <option value="INR">INR - Indian Rupee</option>
+                      <option value="AED">AED - UAE Dirham</option>
+                      <option value="SGD">SGD - Singapore Dollar</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
