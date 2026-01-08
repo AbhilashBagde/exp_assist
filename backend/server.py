@@ -95,6 +95,7 @@ async def signup(email: str = Form(...), password: str = Form(...)):
         "_id": user_id,
         "email": email,
         "password_hash": password_hash,
+        "is_pro_member": False,  # Default to free tier
         "created_at": datetime.utcnow()
     })
     
