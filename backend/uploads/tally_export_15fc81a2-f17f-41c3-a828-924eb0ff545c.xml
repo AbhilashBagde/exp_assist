@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ENVELOPE>
+    <HEADER>
+        <TALLYREQUEST>Import Data</TALLYREQUEST>
+    </HEADER>
+    <BODY>
+        <IMPORTDATA>
+            <REQUESTDESC>
+                <REPORTNAME>Vouchers</REPORTNAME>
+            </REQUESTDESC>
+            <REQUESTDATA>
+                <TALLYMESSAGE xmlns:UDF="TallyUDF">
+                    <VOUCHER REMOTEID="" VCHKEY="" VCHTYPE="Sales" ACTION="Create" OBJVIEW="Invoice Voucher View">
+                        <DATE>20240426</DATE>
+                        <VOUCHERTYPENAME>Sales</VOUCHERTYPENAME>
+                        <VOUCHERNUMBER>EXP-045678</VOUCHERNUMBER>
+                        <PARTYLEDGERNAME>ABC Imports Ltd.</PARTYLEDGERNAME>
+                        <EFFECTIVEDATE>20240426</EFFECTIVEDATE>
+                        <ISINVOICE>Yes</ISINVOICE>
+                        <ALLINVENTORYENTRIES.LIST>
+                            <STOCKITEMNAME>Cotton Shirts</STOCKITEMNAME>
+                            <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+                            <RATE>14.00</RATE>
+                            <AMOUNT>-5600.00</AMOUNT>
+                            <ACTUALQTY>400</ACTUALQTY>
+                            <BILLEDQTY>400</BILLEDQTY>
+                        </ALLINVENTORYENTRIES.LIST>
+                        <ALLINVENTORYENTRIES.LIST>
+                            <STOCKITEMNAME>Leather Belts</STOCKITEMNAME>
+                            <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+                            <RATE>18.00</RATE>
+                            <AMOUNT>-5400.00</AMOUNT>
+                            <ACTUALQTY>300</ACTUALQTY>
+                            <BILLEDQTY>300</BILLEDQTY>
+                        </ALLINVENTORYENTRIES.LIST>
+                        <ALLINVENTORYENTRIES.LIST>
+                            <STOCKITEMNAME>Brass Decor Items</STOCKITEMNAME>
+                            <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+                            <RATE>22.00</RATE>
+                            <AMOUNT>-3300.00</AMOUNT>
+                            <ACTUALQTY>150</ACTUALQTY>
+                            <BILLEDQTY>150</BILLEDQTY>
+                        </ALLINVENTORYENTRIES.LIST>
+                        <ALLINVENTORYENTRIES.LIST>
+                            <STOCKITEMNAME>Handcrafted Wooden Boxes</STOCKITEMNAME>
+                            <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+                            <RATE>25.00</RATE>
+                            <AMOUNT>-5000.00</AMOUNT>
+                            <ACTUALQTY>200</ACTUALQTY>
+                            <BILLEDQTY>200</BILLEDQTY>
+                        </ALLINVENTORYENTRIES.LIST>
+                        <ALLLEDGERENTRIES.LIST>
+                            <LEDGERNAME>ABC Imports Ltd.</LEDGERNAME>
+                            <GSTCLASS/>
+                            <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+                            <AMOUNT>19300.00</AMOUNT>
+                        </ALLLEDGERENTRIES.LIST>
+                        <ALLLEDGERENTRIES.LIST>
+                            <LEDGERNAME>Export Sales</LEDGERNAME>
+                            <GSTCLASS/>
+                            <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
+                            <AMOUNT>-19300.00</AMOUNT>
+                        </ALLLEDGERENTRIES.LIST>
+                    </VOUCHER>
+                </TALLYMESSAGE>
+            </REQUESTDATA>
+        </IMPORTDATA>
+    </BODY>
+</ENVELOPE>
