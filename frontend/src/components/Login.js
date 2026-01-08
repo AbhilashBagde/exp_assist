@@ -27,6 +27,7 @@ function Login({ isSignup = false }) {
 
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user_id', response.data.user_id);
+      localStorage.setItem('is_pro_member', response.data.is_pro_member || 'false');
       navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.detail || 'Authentication failed');
