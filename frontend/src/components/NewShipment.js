@@ -302,13 +302,34 @@ function NewShipment() {
                 <>
                   <FileText className="w-20 h-20 text-navy mx-auto mb-6" />
                   <p className="text-lg text-gray-700 mb-6">Ready to extract data from: <strong>{file?.name}</strong></p>
-                  <button
-                    onClick={handleExtract}
-                    className="px-8 py-3 bg-navy text-white rounded-lg hover:bg-slate-800 transition-colors font-medium"
-                    data-testid="start-extraction-button"
-                  >
-                    Start Extraction
-                  </button>
+                  <div className="flex justify-center space-x-4">
+                    <button
+                      onClick={handleExtract}
+                      className="px-8 py-3 bg-navy text-white rounded-lg hover:bg-slate-800 transition-colors font-medium"
+                      data-testid="start-extraction-button"
+                    >
+                      Start AI Extraction
+                    </button>
+                    <button
+                      onClick={() => {
+                        setFormData({
+                          buyer_name: '',
+                          buyer_address: '',
+                          po_number: '',
+                          po_date: '',
+                          items: [{ description: '', quantity: 0, unit_price: 0, hs_code: '', total_amount: 0 }]
+                        });
+                        setStep(3);
+                      }}
+                      className="px-8 py-3 border-2 border-navy text-navy rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                      data-testid="skip-to-manual-entry"
+                    >
+                      Skip & Enter Manually
+                    </button>
+                  </div>
+                  <p className="text-sm text-slate mt-4">
+                    AI extraction requires Gemini API key. You can skip and enter details manually.
+                  </p>
                 </>
               ) : (
                 <>
