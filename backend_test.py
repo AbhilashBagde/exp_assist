@@ -103,7 +103,7 @@ class ExportAssistAPITester:
                 "email": self.test_email,
                 "password": self.test_password
             },
-            headers={'Content-Type': 'application/x-www-form-urlencoded'}
+            form_data=True
         )
         
         if success and isinstance(response, dict) and 'token' in response:
@@ -124,7 +124,7 @@ class ExportAssistAPITester:
                 "email": self.test_email,
                 "password": self.test_password
             },
-            headers={'Content-Type': 'application/x-www-form-urlencoded'}
+            form_data=True
         )
         
         if success and isinstance(response, dict) and 'token' in response:
@@ -144,7 +144,7 @@ class ExportAssistAPITester:
                 "email": "invalid@example.com",
                 "password": "wrongpassword"
             },
-            headers={'Content-Type': 'application/x-www-form-urlencoded'}
+            form_data=True
         )
         return success
 
