@@ -217,16 +217,74 @@ function Dashboard() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {shipment.status === 'Final' && shipment.pdf_url && (
-                          <a
-                            href={`${API_URL}${shipment.pdf_url}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-navy hover:text-slate-600 font-medium"
-                            data-testid={`download-pdf-${shipment._id}`}
-                          >
-                            Download PDF
-                          </a>
+                        {shipment.status === 'Final' && (
+                          <div className="flex flex-col space-y-1">
+                            {shipment.pdf_url && (
+                              <a
+                                href={`${API_URL}${shipment.pdf_url}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-navy hover:text-slate-600 font-medium"
+                                data-testid={`download-pdf-${shipment._id}`}
+                              >
+                                📄 Invoice PDF
+                              </a>
+                            )}
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const response = await axios.post(
+                                    `${API_URL}/api/shipments/${shipment._id}/generate-packing-list`,
+                                    {},
+                                    {
+                                      headers: { Authorization: `Bearer ${token}` },
+                                      responseType: 'blob'
+                                    }
+                                  );
+                                  const url = window.URL.createObjectURL(new Blob([response.data]));
+                                  const link = document.createElement('a');
+                                  link.href = url;
+                                  link.setAttribute('download', `packing_list_${shipment._id}.pdf`);
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  link.remove();
+                                } catch (err) {
+                                  console.error('Error downloading packing list:', err);
+                                }
+                              }}
+                              className="text-blue-600 hover:text-blue-800 font-medium text-left"
+                              data-testid={`packing-list-${shipment._id}`}
+                            >
+                              📦 Packing List
+                            </button>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const response = await axios.post(
+                                    `${API_URL}/api/shipments/${shipment._id}/export-tally`,
+                                    {},
+                                    {
+                                      headers: { Authorization: `Bearer ${token}` },
+                                      responseType: 'blob'
+                                    }
+                                  );
+                                  const url = window.URL.createObjectURL(new Blob([response.data]));
+                                  const link = document.createElement('a');
+                                  link.href = url;
+                                  link.setAttribute('download', `tally_export_${shipment._id}.xml`);
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  link.remove();
+                                } catch (err) {
+                                  console.error('Error downloading Tally XML:', err);
+                                }
+                              }}
+                              className="text-purple-600 hover:text-purple-800 font-medium text-left"
+                              data-testid={`tally-export-${shipment._id}`}
+                            >
+                              💼 Tally XML
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
