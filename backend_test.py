@@ -14,10 +14,13 @@ class ExportAssistAPITester:
         self.test_email = f"test_user_{datetime.now().strftime('%H%M%S')}@example.com"
         self.test_password = "TestPass123!"
 
-    def run_test(self, name, method, endpoint, expected_status, data=None, files=None, headers=None):
+    def run_test(self, name, method, endpoint, expected_status, data=None, files=None, headers=None, form_data=False):
         """Run a single API test"""
         url = f"{self.base_url}/{endpoint}"
-        test_headers = {'Content-Type': 'application/json'}
+        test_headers = {}
+        
+        if not form_data and not files:
+            test_headers['Content-Type'] = 'application/json'
         
         if headers:
             test_headers.update(headers)
@@ -38,6 +41,8 @@ class ExportAssistAPITester:
                     if 'Content-Type' in test_headers:
                         del test_headers['Content-Type']
                     response = requests.post(url, data=data, files=files, headers=test_headers)
+                elif form_data:
+                    response = requests.post(url, data=data, headers=test_headers)
                 else:
                     response = requests.post(url, json=data, headers=test_headers)
             elif method == 'PUT':
