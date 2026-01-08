@@ -136,7 +136,8 @@ async def save_profile(
     bank_name: str = Form(...),
     account_number: str = Form(...),
     ifsc_code: str = Form(...),
-    swift_code: str = Form("")
+    swift_code: str = Form(""),
+    tally_sales_ledger_name: str = Form("Export Sales")
 ):
     profile_data = {
         "user_id": user_id,
@@ -150,6 +151,7 @@ async def save_profile(
         "account_number": account_number,
         "ifsc_code": ifsc_code,
         "swift_code": swift_code,
+        "tally_sales_ledger_name": tally_sales_ledger_name,
         "updated_at": datetime.utcnow()
     }
     
