@@ -105,7 +105,9 @@ function NewShipment() {
     const updatedItems = [...formData.items];
     updatedItems[index] = {
       ...updatedItems[index],
-      [field]: field === 'quantity' || field === 'unit_price' ? parseFloat(value) || 0 : value
+      [field]: (field === 'quantity' || field === 'unit_price' || field === 'net_weight' || field === 'gross_weight') 
+        ? parseFloat(value) || 0 
+        : value
     };
     
     // Recalculate total_amount
@@ -119,7 +121,15 @@ function NewShipment() {
   const addItem = () => {
     setFormData({
       ...formData,
-      items: [...formData.items, { description: '', quantity: 0, unit_price: 0, hs_code: '', total_amount: 0 }]
+      items: [...formData.items, { 
+        description: '', 
+        quantity: 0, 
+        unit_price: 0, 
+        hs_code: '', 
+        total_amount: 0,
+        net_weight: 0,
+        gross_weight: 0
+      }]
     });
   };
 
