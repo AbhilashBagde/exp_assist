@@ -313,6 +313,21 @@ function Settings() {
                     data-testid="swift-code-input"
                   />
                 </div>
+                <div className="md:col-span-2">
+                  <label className="block text-gray-700 text-sm font-medium mb-2">
+                    Tally Sales Ledger Name
+                  </label>
+                  <input
+                    type="text"
+                    name="tally_sales_ledger_name"
+                    value={formData.tally_sales_ledger_name}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                    placeholder="Export Sales"
+                    data-testid="tally-ledger-input"
+                  />
+                  <p className="text-sm text-slate mt-1">Used for Tally XML export (default: "Export Sales")</p>
+                </div>
               </div>
             </div>
 
