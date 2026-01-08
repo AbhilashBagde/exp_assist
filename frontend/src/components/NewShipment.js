@@ -10,7 +10,6 @@ function NewShipment() {
   const [file, setFile] = useState(null);
   const [filePreview, setFilePreview] = useState(null);
   const [extracting, setExtracting] = useState(false);
-  const [extractedData, setExtractedData] = useState(null);
   const [formData, setFormData] = useState({
     buyer_name: '',
     buyer_address: '',
