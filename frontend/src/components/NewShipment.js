@@ -16,6 +16,11 @@ function NewShipment() {
     po_number: '',
     po_date: '',
     currency: 'USD',
+    port_of_loading: '',
+    port_of_discharge: '',
+    incoterms: 'FOB',
+    total_packages: 1,
+    package_type: 'BOXES',
     items: []
   });
   const [generating, setGenerating] = useState(false);
@@ -158,6 +163,11 @@ function NewShipment() {
       shipmentFormData.append('po_number', formData.po_number);
       shipmentFormData.append('po_date', formData.po_date);
       shipmentFormData.append('currency', formData.currency);
+      shipmentFormData.append('port_of_loading', formData.port_of_loading);
+      shipmentFormData.append('port_of_discharge', formData.port_of_discharge);
+      shipmentFormData.append('incoterms', formData.incoterms);
+      shipmentFormData.append('total_packages', formData.total_packages);
+      shipmentFormData.append('package_type', formData.package_type);
       shipmentFormData.append('items', JSON.stringify(formData.items));
 
       const createResponse = await axios.post(`${API_URL}/api/shipments`, shipmentFormData, {
@@ -344,6 +354,11 @@ function NewShipment() {
                           po_number: '',
                           po_date: '',
                           currency: 'USD',
+                          port_of_loading: '',
+                          port_of_discharge: '',
+                          incoterms: 'FOB',
+                          total_packages: 1,
+                          package_type: 'BOXES',
                           items: [{ description: '', quantity: 0, unit_price: 0, hs_code: '', total_amount: 0, net_weight: 0, gross_weight: 0 }]
                         });
                         setStep(3);
@@ -456,6 +471,95 @@ function NewShipment() {
                       <option value="INR">INR - Indian Rupee</option>
                       <option value="AED">AED - UAE Dirham</option>
                       <option value="SGD">SGD - Singapore Dollar</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Logistics & Shipping Details */}
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-navy mb-3">Logistics & Shipping Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                      Port of Loading
+                    </label>
+                    <input
+                      type="text"
+                      name="port_of_loading"
+                      value={formData.port_of_loading}
+                      onChange={handleFormChange}
+                      placeholder="e.g., INNSA - Nhava Sheva"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                      data-testid="port-of-loading-input"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                      Port of Discharge
+                    </label>
+                    <input
+                      type="text"
+                      name="port_of_discharge"
+                      value={formData.port_of_discharge}
+                      onChange={handleFormChange}
+                      placeholder="e.g., USLAX - Los Angeles"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                      data-testid="port-of-discharge-input"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                      Incoterms
+                    </label>
+                    <select
+                      name="incoterms"
+                      value={formData.incoterms}
+                      onChange={handleFormChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                      data-testid="incoterms-select"
+                    >
+                      <option value="EXW">EXW - Ex Works</option>
+                      <option value="FCA">FCA - Free Carrier</option>
+                      <option value="FOB">FOB - Free on Board</option>
+                      <option value="CFR">CFR - Cost and Freight</option>
+                      <option value="CIF">CIF - Cost, Insurance & Freight</option>
+                      <option value="DDP">DDP - Delivered Duty Paid</option>
+                      <option value="DAP">DAP - Delivered at Place</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                      Total Packages
+                    </label>
+                    <input
+                      type="number"
+                      name="total_packages"
+                      value={formData.total_packages}
+                      onChange={handleFormChange}
+                      min="1"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                      data-testid="total-packages-input"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                      Package Type
+                    </label>
+                    <select
+                      name="package_type"
+                      value={formData.package_type}
+                      onChange={handleFormChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                      data-testid="package-type-select"
+                    >
+                      <option value="BOXES">Boxes</option>
+                      <option value="CARTONS">Cartons</option>
+                      <option value="PALLETS">Pallets</option>
+                      <option value="BAGS">Bags</option>
+                      <option value="DRUMS">Drums</option>
+                      <option value="CRATES">Crates</option>
+                      <option value="BUNDLES">Bundles</option>
                     </select>
                   </div>
                 </div>

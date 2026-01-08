@@ -234,7 +234,12 @@ async def create_shipment(
     po_number: str = Form(...),
     po_date: str = Form(...),
     items: str = Form(...),  # JSON string
-    currency: str = Form("USD")  # Default to USD
+    currency: str = Form("USD"),  # Default to USD
+    port_of_loading: str = Form(""),
+    port_of_discharge: str = Form(""),
+    incoterms: str = Form("FOB"),
+    total_packages: int = Form(1),
+    package_type: str = Form("BOXES")
 ):
     items_list = json.loads(items)
     
@@ -247,6 +252,11 @@ async def create_shipment(
         "po_number": po_number,
         "po_date": po_date,
         "currency": currency,
+        "port_of_loading": port_of_loading,
+        "port_of_discharge": port_of_discharge,
+        "incoterms": incoterms,
+        "total_packages": total_packages,
+        "package_type": package_type,
         "status": "Draft",
         "items": items_list,
         "created_at": datetime.utcnow()
@@ -266,7 +276,12 @@ async def update_shipment(
     po_date: str = Form(...),
     items: str = Form(...),
     currency: str = Form("USD"),
-    status: str = Form("Draft")
+    status: str = Form("Draft"),
+    port_of_loading: str = Form(""),
+    port_of_discharge: str = Form(""),
+    incoterms: str = Form("FOB"),
+    total_packages: int = Form(1),
+    package_type: str = Form("BOXES")
 ):
     items_list = json.loads(items)
     
@@ -278,6 +293,11 @@ async def update_shipment(
             "po_number": po_number,
             "po_date": po_date,
             "currency": currency,
+            "port_of_loading": port_of_loading,
+            "port_of_discharge": port_of_discharge,
+            "incoterms": incoterms,
+            "total_packages": total_packages,
+            "package_type": package_type,
             "items": items_list,
             "status": status,
             "updated_at": datetime.utcnow()
