@@ -117,6 +117,16 @@ function Login({ isSignup = false }) {
             </button>
           </p>
         </div>
+
+        {/* Legal Disclaimer */}
+        <div className="mt-8 pt-6 border-t border-gray-200">
+          <p className="text-xs text-gray-500 text-center leading-relaxed">
+            <strong>Disclaimer:</strong> This document is generated using AI assistance. 
+            The Exporter is solely responsible for verifying all data, including HS Codes 
+            and values, before submission to Customs. ExportAssist assumes no liability 
+            for errors or non-compliance.
+          </p>
+        </div>
       </div>
     </div>
   );
