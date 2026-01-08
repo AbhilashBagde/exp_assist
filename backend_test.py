@@ -183,7 +183,7 @@ class ExportAssistAPITester:
             "api/profile",
             200,
             data=profile_data,
-            headers={'Content-Type': 'application/x-www-form-urlencoded'}
+            form_data=True
         )
         return success
 
