@@ -16,7 +16,8 @@ function Settings() {
     bank_name: '',
     account_number: '',
     ifsc_code: '',
-    swift_code: ''
+    swift_code: '',
+    tally_sales_ledger_name: 'Export Sales'
   });
   const [signatureFile, setSignatureFile] = useState(null);
   const [signaturePreview, setSignaturePreview] = useState(null);
