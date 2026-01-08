@@ -306,6 +306,7 @@ async def extract_po_data(
   "buyer_address": "Full address of the buyer",
   "po_number": "Purchase Order number",
   "po_date": "Date in YYYY-MM-DD format",
+  "currency_code": "Detected currency code",
   "items": [
     {
       "description": "Item description",
@@ -315,6 +316,21 @@ async def extract_po_data(
     }
   ]
 }
+
+CRITICAL - CURRENCY DETECTION:
+STRICTLY look for currency indicators in the document. Scan the 'Total', 'Amount', 'Rate', or 'Price' columns/fields for:
+- Currency symbols: ₹, $, €, £, ¥, د.إ
+- Currency codes: INR, USD, EUR, GBP, AED, SGD, JPY
+- Text indicators: Rs, Rupees, Dollars
+
+Currency Detection Rules:
+- If you see '₹', 'Rs', 'Rupees', or 'INR' → set currency_code to "INR"
+- If you see '$' or 'USD' → set currency_code to "USD"
+- If you see '£' or 'GBP' → set currency_code to "GBP"
+- If you see '€' or 'EUR' → set currency_code to "EUR"
+- If you see 'د.إ' or 'AED' → set currency_code to "AED"
+- If you see 'S$' or 'SGD' → set currency_code to "SGD"
+- If no clear currency found → default to "USD"
 
 For the HS Code prediction:
 - Analyze the item description carefully
