@@ -290,8 +290,8 @@ async def extract_po_data(
         # Prepare image for Gemini
         image = PILImage.open(io.BytesIO(image_data))
         
-        # Use Gemini Pro Vision API (stable model for image analysis)
-        model = genai.GenerativeModel('gemini-pro-vision')
+        # Use Gemini 2.5 Flash (stable multimodal model)
+        model = genai.GenerativeModel('models/gemini-2.5-flash')
         
         prompt = """Analyze this Purchase Order document image. Extract the following information and return ONLY a valid JSON object:
 
