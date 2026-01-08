@@ -98,14 +98,40 @@ function Dashboard() {
             <h2 className="text-3xl font-bold text-navy" data-testid="page-title">Dashboard</h2>
             <p className="text-slate mt-1">Manage your export shipments and invoices</p>
           </div>
-          <button
-            onClick={() => navigate('/new-shipment')}
-            className="flex items-center space-x-2 px-6 py-3 bg-navy text-white rounded-lg hover:bg-slate-800 transition-colors shadow-md"
-            data-testid="new-shipment-button"
-          >
-            <Plus className="w-5 h-5" />
-            <span className="font-medium">New Shipment</span>
-          </button>
+          <div className="flex space-x-3">
+            <button
+              onClick={async () => {
+                try {
+                  const response = await axios.get(`${API_URL}/api/reports/gstr1-export`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                    responseType: 'blob'
+                  });
+                  const url = window.URL.createObjectURL(new Blob([response.data]));
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.setAttribute('download', 'gstr1_export_data.csv');
+                  document.body.appendChild(link);
+                  link.click();
+                  link.remove();
+                } catch (err) {
+                  console.error('Error downloading GSTR-1:', err);
+                }
+              }}
+              className="flex items-center space-x-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-md"
+              data-testid="gstr1-export-button"
+            >
+              <FileText className="w-5 h-5" />
+              <span className="font-medium">Download GSTR-1 Data</span>
+            </button>
+            <button
+              onClick={() => navigate('/new-shipment')}
+              className="flex items-center space-x-2 px-6 py-3 bg-navy text-white rounded-lg hover:bg-slate-800 transition-colors shadow-md"
+              data-testid="new-shipment-button"
+            >
+              <Plus className="w-5 h-5" />
+              <span className="font-medium">New Shipment</span>
+            </button>
+          </div>
         </div>
 
         {/* Shipments Table */}
