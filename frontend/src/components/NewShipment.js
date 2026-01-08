@@ -84,6 +84,10 @@ function NewShipment() {
       setStep(3); // Move to Step C (Review Form)
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to extract data from document');
+      if (err.response?.status === 401) {
+        localStorage.clear();
+        navigate('/login');
+      }
     } finally {
       setExtracting(false);
     }
