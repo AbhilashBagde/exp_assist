@@ -151,6 +151,7 @@ function NewShipment() {
       shipmentFormData.append('buyer_address', formData.buyer_address);
       shipmentFormData.append('po_number', formData.po_number);
       shipmentFormData.append('po_date', formData.po_date);
+      shipmentFormData.append('currency', formData.currency);
       shipmentFormData.append('items', JSON.stringify(formData.items));
 
       const createResponse = await axios.post(`${API_URL}/api/shipments`, shipmentFormData, {
