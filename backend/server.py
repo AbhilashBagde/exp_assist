@@ -216,17 +216,27 @@ async def get_user_info(user_id: str = Depends(verify_token)):
 # Exchange Rate Endpoint
 @app.get("/api/exchange-rates")
 async def get_exchange_rates(currency: str = None):
-    """Get exchange rates to INR"""
+    """Get live exchange rates to INR"""
+    # Fetch live rates
+    live_rates = await fetch_live_exchange_rates()
+    
+    is_live = exchange_rate_cache["last_updated"] is not None
+    last_updated = exchange_rate_cache["last_updated"].isoformat() if exchange_rate_cache["last_updated"] else None
+    
     if currency:
-        rate = get_inr_rate(currency)
+        rate = live_rates.get(currency.upper(), FALLBACK_RATES_TO_INR.get(currency.upper(), 83.50))
         return {
             "currency": currency.upper(),
-            "rate_to_inr": rate,
-            "rates": EXCHANGE_RATES_TO_INR
+            "rate_to_inr": round(rate, 2),
+            "is_live": is_live,
+            "last_updated": last_updated,
+            "rates": {k: round(v, 2) for k, v in live_rates.items()}
         }
     return {
         "base": "INR",
-        "rates": EXCHANGE_RATES_TO_INR
+        "is_live": is_live,
+        "last_updated": last_updated,
+        "rates": {k: round(v, 2) for k, v in live_rates.items()}
     }
 
 # Company Profile Endpoints
