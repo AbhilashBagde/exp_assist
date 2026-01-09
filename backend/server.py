@@ -66,6 +66,23 @@ security = HTTPBearer()
 UPLOADS_DIR = Path("/app/backend/uploads")
 UPLOADS_DIR.mkdir(exist_ok=True)
 
+# Exchange Rates to INR (approximate rates - can be updated)
+EXCHANGE_RATES_TO_INR = {
+    "USD": 83.50,
+    "EUR": 90.50,
+    "GBP": 105.50,
+    "AED": 22.75,
+    "SGD": 62.00,
+    "INR": 1.00,
+    "JPY": 0.56,
+    "CAD": 61.50,
+    "AUD": 54.00,
+}
+
+def get_inr_rate(currency: str) -> float:
+    """Get exchange rate to convert currency to INR"""
+    return EXCHANGE_RATES_TO_INR.get(currency.upper(), 83.50)  # Default to USD rate
+
 # Helper Functions
 def create_token(user_id: str) -> str:
     payload = {
