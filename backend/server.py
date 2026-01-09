@@ -67,8 +67,8 @@ security = HTTPBearer()
 UPLOADS_DIR = Path("/app/backend/uploads")
 UPLOADS_DIR.mkdir(exist_ok=True)
 
-# Exchange Rates to INR (approximate rates - can be updated)
-EXCHANGE_RATES_TO_INR = {
+# Fallback Exchange Rates to INR (used when API fails)
+FALLBACK_RATES_TO_INR = {
     "USD": 83.50,
     "EUR": 90.50,
     "GBP": 105.50,
@@ -80,9 +80,69 @@ EXCHANGE_RATES_TO_INR = {
     "AUD": 54.00,
 }
 
-def get_inr_rate(currency: str) -> float:
-    """Get exchange rate to convert currency to INR"""
-    return EXCHANGE_RATES_TO_INR.get(currency.upper(), 83.50)  # Default to USD rate
+# Cache for exchange rates (to avoid too many API calls)
+exchange_rate_cache = {
+    "rates": {},
+    "last_updated": None
+}
+
+async def fetch_live_exchange_rates():
+    """Fetch live exchange rates from free API"""
+    try:
+        # Check if cache is still valid (less than 1 hour old)
+        if exchange_rate_cache["last_updated"]:
+            time_diff = datetime.utcnow() - exchange_rate_cache["last_updated"]
+            if time_diff.total_seconds() < 3600:  # 1 hour cache
+                return exchange_rate_cache["rates"]
+        
+        # Fetch from free API (frankfurter.app - no API key required)
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://api.frankfurter.app/latest?to=INR",
+                timeout=10.0
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                inr_rate_from_eur = data["rates"]["INR"]
+                
+                # Now get rates from EUR to other currencies
+                response2 = await client.get(
+                    "https://api.frankfurter.app/latest?from=EUR",
+                    timeout=10.0
+                )
+                
+                if response2.status_code == 200:
+                    data2 = response2.json()
+                    rates_from_eur = data2["rates"]
+                    
+                    # Calculate rates to INR for each currency
+                    rates_to_inr = {"INR": 1.00, "EUR": inr_rate_from_eur}
+                    for currency, rate_from_eur in rates_from_eur.items():
+                        if currency != "INR":
+                            # Convert: 1 currency = X EUR, 1 EUR = Y INR
+                            # So 1 currency = Y/X INR
+                            rates_to_inr[currency] = inr_rate_from_eur / rate_from_eur
+                    
+                    # Update cache
+                    exchange_rate_cache["rates"] = rates_to_inr
+                    exchange_rate_cache["last_updated"] = datetime.utcnow()
+                    
+                    return rates_to_inr
+        
+        # Return cached rates if available, else fallback
+        return exchange_rate_cache["rates"] if exchange_rate_cache["rates"] else FALLBACK_RATES_TO_INR
+        
+    except Exception as e:
+        print(f"Error fetching exchange rates: {e}")
+        # Return cached rates if available, else fallback
+        return exchange_rate_cache["rates"] if exchange_rate_cache["rates"] else FALLBACK_RATES_TO_INR
+
+def get_inr_rate_sync(currency: str, rates: dict = None) -> float:
+    """Get exchange rate to convert currency to INR (sync version)"""
+    if rates:
+        return rates.get(currency.upper(), FALLBACK_RATES_TO_INR.get(currency.upper(), 83.50))
+    return FALLBACK_RATES_TO_INR.get(currency.upper(), 83.50)
 
 # Helper Functions
 def create_token(user_id: str) -> str:
