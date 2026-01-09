@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Upload, FileText, CheckCircle, ArrowLeft, Loader, AlertCircle, Edit } from 'lucide-react';
+import { Package, Upload, FileText, CheckCircle, ArrowLeft, Loader, AlertCircle, Edit, Sparkles } from 'lucide-react';
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
