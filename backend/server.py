@@ -152,6 +152,22 @@ async def get_user_info(user_id: str = Depends(verify_token)):
         "created_at": user["created_at"].isoformat()
     }
 
+# Exchange Rate Endpoint
+@app.get("/api/exchange-rates")
+async def get_exchange_rates(currency: str = None):
+    """Get exchange rates to INR"""
+    if currency:
+        rate = get_inr_rate(currency)
+        return {
+            "currency": currency.upper(),
+            "rate_to_inr": rate,
+            "rates": EXCHANGE_RATES_TO_INR
+        }
+    return {
+        "base": "INR",
+        "rates": EXCHANGE_RATES_TO_INR
+    }
+
 # Company Profile Endpoints
 @app.get("/api/profile")
 async def get_profile(user_id: str = Depends(verify_token)):
