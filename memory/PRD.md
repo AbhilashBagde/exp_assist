@@ -103,6 +103,8 @@ net_weight, gross_weight
 - [x] Pro subscription tier
 - [x] Logistics fields (ports, incoterms, packages)
 - [x] Critical PDF bug fix (KeepTogether → nested table)
+- [x] PDF footer layout fix (banking text overflow)
+- [x] Frontend error handling improvement (validation errors)
 
 ## Backlog
 
