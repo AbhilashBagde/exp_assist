@@ -11,6 +11,7 @@ import bcrypt
 import json
 import base64
 import io
+import httpx
 from pathlib import Path
 from dotenv import load_dotenv
 import google.generativeai as genai
