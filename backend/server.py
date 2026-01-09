@@ -830,7 +830,7 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
             Paragraph('<b>Qty</b>', table_header_style),
             Paragraph(f'<b>Rate ({currency})</b>', table_header_style),
             Paragraph(f'<b>Amount ({currency})</b>', table_header_style),
-            Paragraph('<b>Amount (₹ INR)</b>', table_header_style)
+            Paragraph('<b>Amount (INR)</b>', table_header_style)
         ]]
         
         total_inr = 0
