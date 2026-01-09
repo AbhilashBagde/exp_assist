@@ -808,11 +808,19 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
     elements.append(Spacer(1, 0.1*inch))
     
     # ========== ZONE 5: THE SUMMARY ==========
+    # Build summary text based on whether INR is included
+    summary_right_text = f"<b>Total Net Weight:</b> {total_net_weight:.2f} kg<br/>"
+    summary_right_text += f"<b>Total Gross Weight:</b> {total_gross_weight:.2f} kg<br/>"
+    summary_right_text += f"<b>TOTAL ({currency}):</b> {total_amount:,.2f}"
+    
+    if include_inr:
+        total_inr = total_amount * inr_rate
+        summary_right_text += f"<br/><b>TOTAL (INR):</b> ₹{total_inr:,.2f}"
+        summary_right_text += f"<br/><i style='font-size:8'>Exchange Rate: 1 {currency} = ₹{inr_rate:.2f}</i>"
+    
     summary_data = [[
         Paragraph(f"<b>Total Packages:</b> {total_packages} {package_type}", styles['Normal']),
-        Paragraph(f"<b>Total Net Weight:</b> {total_net_weight:.2f} kg<br/>"
-                 f"<b>Total Gross Weight:</b> {total_gross_weight:.2f} kg<br/>"
-                 f"<b>TOTAL ({currency}):</b> {total_amount:,.2f}",
+        Paragraph(summary_right_text,
                  ParagraphStyle('SummaryRight', parent=styles['Normal'], alignment=TA_RIGHT, fontName='Helvetica-Bold'))
     ]]
     
