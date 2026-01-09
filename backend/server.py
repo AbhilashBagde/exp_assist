@@ -816,7 +816,8 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
     
     # Check if INR column should be included
     include_inr = shipment.get('include_inr_column', False) and currency != 'INR'
-    inr_rate = get_inr_rate(currency) if include_inr else 1
+    # Get INR rate from cache or fallback
+    inr_rate = get_inr_rate_sync(currency, exchange_rate_cache.get("rates")) if include_inr else 1
     
     # Create items table with repeatRows for header on each page
     if include_inr:
