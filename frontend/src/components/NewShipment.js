@@ -95,7 +95,19 @@ function NewShipment() {
       setFormData(extractedData);
       setStep(3); // Move to Step C (Review Form)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to extract data from document');
+      // Handle error - ensure it's a string, not an object
+      let errorMessage = 'Failed to extract data from document';
+      if (err.response?.data?.detail) {
+        const detail = err.response.data.detail;
+        if (typeof detail === 'string') {
+          errorMessage = detail;
+        } else if (Array.isArray(detail)) {
+          errorMessage = detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ');
+        } else if (typeof detail === 'object') {
+          errorMessage = detail.msg || detail.message || JSON.stringify(detail);
+        }
+      }
+      setError(errorMessage);
       if (err.response?.status === 401) {
         localStorage.clear();
         navigate('/login');
