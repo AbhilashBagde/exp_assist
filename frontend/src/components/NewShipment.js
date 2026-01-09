@@ -138,10 +138,18 @@ function NewShipment() {
 
   // Step C: Form Handling
   const handleFormChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    const newValue = type === 'checkbox' ? checked : value;
+    
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: newValue
     });
+    
+    // Update exchange rate when currency changes
+    if (name === 'currency') {
+      updateExchangeRate(value);
+    }
   };
 
   const handleItemChange = (index, field, value) => {
