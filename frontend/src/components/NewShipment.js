@@ -26,6 +26,7 @@ function NewShipment() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
   const [generatedShipmentId, setGeneratedShipmentId] = useState(null);
+  const [suggestingHsCode, setSuggestingHsCode] = useState(null); // Track which item index is being suggested
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
 
