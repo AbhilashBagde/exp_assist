@@ -843,7 +843,7 @@ function NewShipment() {
                           </td>
                           {formData.currency !== 'INR' && (
                             <td className="px-2 py-3 font-medium text-sm bg-green-50 text-green-700" data-testid={`item-inr-${index}`}>
-                              ₹{(item.total_amount * exchangeRate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {(item.total_amount * exchangeRate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </td>
                           )}
                           <td className="px-2 py-3">
@@ -868,7 +868,7 @@ function NewShipment() {
                     <div className="flex justify-between items-center">
                       <div>
                         <p className="text-sm text-green-800">
-                          <strong>Total in INR:</strong> ₹{(formData.items.reduce((sum, item) => sum + item.total_amount, 0) * exchangeRate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          <strong>Total in INR (₹):</strong> {(formData.items.reduce((sum, item) => sum + item.total_amount, 0) * exchangeRate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                         <div className="flex items-center space-x-2 mt-1">
                           <p className="text-xs text-green-600">
