@@ -259,6 +259,7 @@ function NewShipment() {
       shipmentFormData.append('incoterms', formData.incoterms);
       shipmentFormData.append('total_packages', formData.total_packages);
       shipmentFormData.append('package_type', formData.package_type);
+      shipmentFormData.append('include_inr_column', formData.include_inr_column);
       shipmentFormData.append('items', JSON.stringify(formData.items));
 
       const createResponse = await axios.post(`${API_URL}/api/shipments`, shipmentFormData, {
