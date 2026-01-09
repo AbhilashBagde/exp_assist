@@ -827,7 +827,7 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
             Paragraph('<b>Qty</b>', table_header_style),
             Paragraph(f'<b>Rate ({currency})</b>', table_header_style),
             Paragraph(f'<b>Amount ({currency})</b>', table_header_style),
-            Paragraph('<b>Amount (INR)</b>', table_header_style)
+            Paragraph('<b>Amount (₹ INR)</b>', table_header_style)
         ]]
         
         total_inr = 0
@@ -840,7 +840,7 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
                 str(item['quantity']),
                 f"{item['unit_price']:.2f}",
                 f"{item['total_amount']:,.2f}",
-                f"₹{inr_amount:,.2f}"
+                f"{inr_amount:,.2f}"
             ])
         
         items_table = Table(items_data, colWidths=[2.4*inch, 0.9*inch, 0.6*inch, 1*inch, 1.1*inch, 1.5*inch], repeatRows=1)
