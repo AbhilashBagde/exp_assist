@@ -699,15 +699,31 @@ function NewShipment() {
                             />
                           </td>
                           <td className="px-2 py-3 bg-yellow-50">
-                            <input
-                              type="text"
-                              value={item.hs_code}
-                              onChange={(e) => handleItemChange(index, 'hs_code', e.target.value)}
-                              className="w-full px-2 py-1 border-2 border-yellow-400 rounded focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm"
-                              placeholder="Verify!"
-                              required
-                              data-testid={`item-hs-code-${index}`}
-                            />
+                            <div className="flex items-center space-x-1">
+                              <input
+                                type="text"
+                                value={item.hs_code}
+                                onChange={(e) => handleItemChange(index, 'hs_code', e.target.value)}
+                                className="w-full px-2 py-1 border-2 border-yellow-400 rounded focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm"
+                                placeholder="Enter or AI suggest"
+                                required
+                                data-testid={`item-hs-code-${index}`}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => suggestHsCode(index)}
+                                disabled={suggestingHsCode === index}
+                                className="px-2 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors text-xs flex items-center disabled:opacity-50 disabled:cursor-wait"
+                                title="AI Suggest HS Code"
+                                data-testid={`suggest-hs-code-${index}`}
+                              >
+                                {suggestingHsCode === index ? (
+                                  <Loader className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <Sparkles className="w-3 h-3" />
+                                )}
+                              </button>
+                            </div>
                           </td>
                           <td className="px-2 py-3">
                             <input
