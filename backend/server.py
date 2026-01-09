@@ -430,13 +430,113 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
     pdf_filename = f"invoice_{shipment_id}.pdf"
     pdf_path = UPLOADS_DIR / pdf_filename
     
-    doc = SimpleDocTemplate(str(pdf_path), pagesize=A4, 
-                           topMargin=0.5*inch, bottomMargin=0.5*inch,
-                           leftMargin=0.5*inch, rightMargin=0.5*inch)
-    elements = []
-    
     styles = getSampleStyleSheet()
     currency = shipment.get('currency', 'USD')
+    
+    # Calculate totals upfront
+    total_amount = sum(item['total_amount'] for item in shipment['items'])
+    total_packages = shipment.get('total_packages', 1)
+    package_type = shipment.get('package_type', 'BOXES')
+    total_net_weight = sum(item.get('net_weight', 0) for item in shipment['items'])
+    total_gross_weight = sum(item.get('gross_weight', 0) for item in shipment['items'])
+    
+    # ========== CUSTOM DOCUMENT CLASS FOR MULTI-PAGE SUPPORT ==========
+    class InvoiceDocTemplate(BaseDocTemplate):
+        def __init__(self, filename, **kwargs):
+            self.company_name = kwargs.pop('company_name', '')
+            self.invoice_no = kwargs.pop('invoice_no', '')
+            self.invoice_date = kwargs.pop('invoice_date', '')
+            BaseDocTemplate.__init__(self, filename, **kwargs)
+            
+            # Define frame for content
+            frame = Frame(
+                self.leftMargin, 
+                self.bottomMargin + 0.4*inch,  # Leave space for footer
+                self.width, 
+                self.height - 0.8*inch,  # Leave space for header on later pages
+                id='normal'
+            )
+            
+            # First page template (full header)
+            first_frame = Frame(
+                self.leftMargin,
+                self.bottomMargin + 0.4*inch,
+                self.width,
+                self.height - 0.4*inch,
+                id='first'
+            )
+            
+            # Later pages template (compact header)
+            later_frame = Frame(
+                self.leftMargin,
+                self.bottomMargin + 0.4*inch,
+                self.width,
+                self.height - 0.8*inch,
+                id='later'
+            )
+            
+            self.addPageTemplates([
+                PageTemplate(id='First', frames=[first_frame], onPage=self.on_first_page),
+                PageTemplate(id='Later', frames=[later_frame], onPage=self.on_later_pages),
+            ])
+        
+        def on_first_page(self, canvas, doc):
+            canvas.saveState()
+            # Page number at bottom
+            canvas.setFont('Helvetica', 9)
+            canvas.setFillColor(colors.grey)
+            page_num_text = f"Page {doc.page}"
+            canvas.drawCentredString(A4[0]/2, 0.3*inch, page_num_text)
+            canvas.restoreState()
+        
+        def on_later_pages(self, canvas, doc):
+            canvas.saveState()
+            
+            # Compact header for continuation pages
+            canvas.setFont('Helvetica-Bold', 12)
+            canvas.setFillColor(colors.HexColor('#0f172a'))
+            canvas.drawString(0.5*inch, A4[1] - 0.4*inch, f"{self.company_name}")
+            
+            canvas.setFont('Helvetica', 10)
+            canvas.drawString(0.5*inch, A4[1] - 0.6*inch, f"Invoice: {self.invoice_no} | Date: {self.invoice_date}")
+            
+            # "Continued" indicator
+            canvas.setFont('Helvetica-Oblique', 9)
+            canvas.setFillColor(colors.grey)
+            canvas.drawRightString(A4[0] - 0.5*inch, A4[1] - 0.5*inch, "...continued")
+            
+            # Line separator
+            canvas.setStrokeColor(colors.HexColor('#0f172a'))
+            canvas.setLineWidth(1)
+            canvas.line(0.5*inch, A4[1] - 0.7*inch, A4[0] - 0.5*inch, A4[1] - 0.7*inch)
+            
+            # Page number at bottom
+            canvas.setFont('Helvetica', 9)
+            canvas.setFillColor(colors.grey)
+            page_num_text = f"Page {doc.page}"
+            canvas.drawCentredString(A4[0]/2, 0.3*inch, page_num_text)
+            
+            canvas.restoreState()
+        
+        def afterFlowable(self, flowable):
+            # Switch to 'Later' template after first page
+            if self.page == 1:
+                self._nextPageTemplateIndex = 1  # Switch to 'Later' template
+    
+    # Create document with custom template
+    doc = InvoiceDocTemplate(
+        str(pdf_path), 
+        pagesize=A4,
+        topMargin=0.5*inch, 
+        bottomMargin=0.5*inch,
+        leftMargin=0.5*inch, 
+        rightMargin=0.5*inch,
+        company_name=profile['company_name'],
+        invoice_no=shipment['po_number'],
+        invoice_date=shipment['po_date']
+    )
+    
+    elements = []
     
     # ========== ZONE 1: THE HEADER (Top Strip) ==========
     header_data = [
@@ -522,16 +622,19 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
     elements.append(logistics_table)
     elements.append(Spacer(1, 0.15*inch))
     
-    # ========== ZONE 4: THE GOODS (Main Table) ==========
+    # ========== ZONE 4: THE GOODS (Main Table) - SPLIT FOR MULTI-PAGE ==========
+    # Table header style
+    table_header_style = ParagraphStyle('TableHeader', parent=styles['Normal'], fontSize=9, textColor=colors.whitesmoke)
+    
+    # Create items table with repeatRows for header on each page
     items_data = [[
-        Paragraph('<b>Description</b>', styles['Normal']),
-        Paragraph('<b>HS Code</b>', styles['Normal']),
-        Paragraph('<b>Qty</b>', styles['Normal']),
-        Paragraph(f'<b>Rate ({currency})</b>', styles['Normal']),
-        Paragraph(f'<b>Amount ({currency})</b>', styles['Normal'])
+        Paragraph('<b>Description</b>', table_header_style),
+        Paragraph('<b>HS Code</b>', table_header_style),
+        Paragraph('<b>Qty</b>', table_header_style),
+        Paragraph(f'<b>Rate ({currency})</b>', table_header_style),
+        Paragraph(f'<b>Amount ({currency})</b>', table_header_style)
     ]]
     
-    total_amount = 0
     for item in shipment['items']:
         items_data.append([
             item['description'],
@@ -540,9 +643,8 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
             f"{item['unit_price']:.2f}",
             f"{item['total_amount']:,.2f}"
         ])
-        total_amount += item['total_amount']
     
-    items_table = Table(items_data, colWidths=[3*inch, 1*inch, 0.7*inch, 1.15*inch, 1.65*inch])
+    items_table = Table(items_data, colWidths=[3*inch, 1*inch, 0.7*inch, 1.15*inch, 1.65*inch], repeatRows=1)
     items_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0f172a')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -553,16 +655,13 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
         ('TOPPADDING', (0, 0), (-1, -1), 4),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        # Alternate row colors for better readability
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
     ]))
     elements.append(items_table)
     elements.append(Spacer(1, 0.1*inch))
     
     # ========== ZONE 5: THE SUMMARY ==========
-    total_packages = shipment.get('total_packages', 1)
-    package_type = shipment.get('package_type', 'BOXES')
-    total_net_weight = sum(item.get('net_weight', 0) for item in shipment['items'])
-    total_gross_weight = sum(item.get('gross_weight', 0) for item in shipment['items'])
-    
     summary_data = [[
         Paragraph(f"<b>Total Packages:</b> {total_packages} {package_type}", styles['Normal']),
         Paragraph(f"<b>Total Net Weight:</b> {total_net_weight:.2f} kg<br/>"
