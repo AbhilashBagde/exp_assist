@@ -274,7 +274,8 @@ async def create_shipment(
     port_of_discharge: str = Form(""),
     incoterms: str = Form("FOB"),
     total_packages: int = Form(1),
-    package_type: str = Form("BOXES")
+    package_type: str = Form("BOXES"),
+    include_inr_column: bool = Form(False)
 ):
     items_list = json.loads(items)
     
@@ -292,6 +293,7 @@ async def create_shipment(
         "incoterms": incoterms,
         "total_packages": total_packages,
         "package_type": package_type,
+        "include_inr_column": include_inr_column,
         "status": "Draft",
         "items": items_list,
         "created_at": datetime.utcnow()
