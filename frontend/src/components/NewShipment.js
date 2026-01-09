@@ -806,6 +806,11 @@ function NewShipment() {
                               <div className="text-xs text-red-600 mt-1">Math Mismatch!</div>
                             )}
                           </td>
+                          {formData.currency !== 'INR' && (
+                            <td className="px-2 py-3 font-medium text-sm bg-green-50 text-green-700" data-testid={`item-inr-${index}`}>
+                              ₹{(item.total_amount * exchangeRate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                          )}
                           <td className="px-2 py-3">
                             <button
                               type="button"
@@ -821,6 +826,33 @@ function NewShipment() {
                     </tbody>
                   </table>
                 </div>
+
+                {/* INR Total and Include Option */}
+                {formData.currency !== 'INR' && formData.items.length > 0 && (
+                  <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-sm text-green-800">
+                          <strong>Total in INR:</strong> ₹{(formData.items.reduce((sum, item) => sum + item.total_amount, 0) * exchangeRate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-xs text-green-600 mt-1">
+                          Exchange Rate: 1 {formData.currency} = ₹{exchangeRate.toFixed(2)}
+                        </p>
+                      </div>
+                      <label className="flex items-center space-x-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          name="include_inr_column"
+                          checked={formData.include_inr_column}
+                          onChange={handleFormChange}
+                          className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                          data-testid="include-inr-checkbox"
+                        />
+                        <span className="text-sm font-medium text-green-800">Include INR column in PDF</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
 
                 <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <p className="text-sm text-yellow-800">
