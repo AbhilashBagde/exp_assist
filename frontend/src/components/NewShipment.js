@@ -703,6 +703,9 @@ function NewShipment() {
                         <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Net Wt (kg)</th>
                         <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Gross Wt (kg)</th>
                         <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Amount ({formData.currency})</th>
+                        {formData.currency !== 'INR' && (
+                          <th className="px-2 py-3 text-left text-xs font-medium text-green-700 uppercase bg-green-50">Amount (INR)</th>
+                        )}
                         <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Action</th>
                       </tr>
                     </thead>
