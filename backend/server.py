@@ -890,8 +890,8 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
     
     if include_inr:
         total_inr = total_amount * inr_rate
-        summary_right_text += f"<br/><b>TOTAL (₹ INR):</b> {total_inr:,.2f}"
-        summary_right_text += f"<br/><i style='font-size:8'>Exchange Rate: 1 {currency} = ₹{inr_rate:.2f}</i>"
+        summary_right_text += f"<br/><b>TOTAL (INR):</b> {total_inr:,.2f}"
+        summary_right_text += f"<br/><i style='font-size:8'>Exchange Rate: 1 {currency} = INR {inr_rate:.2f}</i>"
     
     summary_data = [[
         Paragraph(f"<b>Total Packages:</b> {total_packages} {package_type}", styles['Normal']),
