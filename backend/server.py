@@ -346,9 +346,12 @@ async def create_shipment(
     incoterms: str = Form("FOB"),
     total_packages: int = Form(1),
     package_type: str = Form("BOXES"),
-    include_inr_column: bool = Form(False)
+    include_inr_column: str = Form("false")
 ):
     items_list = json.loads(items)
+    
+    # Parse include_inr_column as boolean
+    include_inr_bool = include_inr_column.lower() in ('true', '1', 'yes')
     
     shipment_id = str(uuid.uuid4())
     shipment_data = {
