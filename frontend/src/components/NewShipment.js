@@ -758,7 +758,47 @@ function NewShipment() {
           <div className="bg-white rounded-lg shadow-md p-8 text-center" data-testid="success-step">
             <CheckCircle className="w-20 h-20 text-green-500 mx-auto mb-6" />
             <h2 className="text-2xl font-bold text-navy mb-4">Invoice Generated Successfully!</h2>
-            <p className="text-slate mb-8">Your Commercial Invoice PDF has been generated and downloaded.</p>
+            <p className="text-slate mb-4">Your Commercial Invoice PDF has been generated.</p>
+            
+            {/* Manual Download Button */}
+            {generatedShipmentId && (
+              <div className="mb-8">
+                <button
+                  onClick={async () => {
+                    try {
+                      const response = await axios.post(
+                        `${API_URL}/api/shipments/${generatedShipmentId}/generate-pdf`,
+                        {},
+                        {
+                          headers: { Authorization: `Bearer ${token}` },
+                          responseType: 'blob'
+                        }
+                      );
+                      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.setAttribute('download', `invoice_${generatedShipmentId}.pdf`);
+                      link.style.display = 'none';
+                      document.body.appendChild(link);
+                      link.click();
+                      setTimeout(() => {
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(url);
+                      }, 100);
+                    } catch (err) {
+                      console.error('Download failed:', err);
+                      alert('Download failed. Please try again.');
+                    }
+                  }}
+                  className="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium inline-flex items-center space-x-2"
+                  data-testid="download-invoice-button"
+                >
+                  <FileText className="w-5 h-5" />
+                  <span>Download Invoice PDF</span>
+                </button>
+                <p className="text-sm text-gray-500 mt-2">Click here if the download didn't start automatically</p>
+              </div>
+            )}
             
             <div className="flex justify-center space-x-4">
               <button
