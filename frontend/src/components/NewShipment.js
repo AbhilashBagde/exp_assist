@@ -164,6 +164,58 @@ function NewShipment() {
     setFormData({ ...formData, items: updatedItems });
   };
 
+  // AI HS Code Suggestion
+  const suggestHsCode = async (index) => {
+    const item = formData.items[index];
+    if (!item.description || item.description.trim().length < 3) {
+      setError('Please enter an item description first (at least 3 characters)');
+      return;
+    }
+
+    setSuggestingHsCode(index);
+    setError('');
+
+    try {
+      const suggestionFormData = new FormData();
+      suggestionFormData.append('description', item.description);
+
+      const response = await axios.post(`${API_URL}/api/suggest-hs-code`, suggestionFormData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      if (response.data.success) {
+        // Update the HS code for this item
+        const updatedItems = [...formData.items];
+        updatedItems[index] = {
+          ...updatedItems[index],
+          hs_code: response.data.hs_code
+        };
+        setFormData({ ...formData, items: updatedItems });
+        
+        // Show confidence info
+        if (response.data.confidence === 'low') {
+          setError(`HS Code suggested (Low confidence): ${response.data.notes || 'Please verify carefully'}`);
+        }
+      }
+    } catch (err) {
+      let errorMessage = 'Failed to suggest HS Code';
+      if (err.response?.data?.detail) {
+        const detail = err.response.data.detail;
+        if (typeof detail === 'string') {
+          errorMessage = detail;
+        } else if (typeof detail === 'object') {
+          errorMessage = detail.msg || JSON.stringify(detail);
+        }
+      }
+      setError(errorMessage);
+    } finally {
+      setSuggestingHsCode(null);
+    }
+  };
+
   // Step D: Save & Generate PDF
   const handleSaveAndGenerate = async () => {
     setGenerating(true);
