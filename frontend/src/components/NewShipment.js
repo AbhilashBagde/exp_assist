@@ -200,7 +200,20 @@ function NewShipment() {
 
       setStep(4); // Success step
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to generate invoice');
+      // Handle error - ensure it's a string, not an object
+      let errorMessage = 'Failed to generate invoice';
+      if (err.response?.data?.detail) {
+        const detail = err.response.data.detail;
+        if (typeof detail === 'string') {
+          errorMessage = detail;
+        } else if (Array.isArray(detail)) {
+          // FastAPI validation errors come as array
+          errorMessage = detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ');
+        } else if (typeof detail === 'object') {
+          errorMessage = detail.msg || detail.message || JSON.stringify(detail);
+        }
+      }
+      setError(errorMessage);
       if (err.response?.status === 401) {
         localStorage.clear();
         navigate('/login');

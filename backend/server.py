@@ -579,7 +579,15 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
     elements.append(Spacer(1, 0.2*inch))
     
     # ========== ZONE 6: THE FOOTER (Banking & Auth) ==========
-    # Left Side: Banking Instructions
+    # Left Side: Banking Instructions - Use a style with proper wrapping
+    banking_style = ParagraphStyle(
+        'Banking',
+        parent=styles['Normal'],
+        fontSize=9,
+        leading=12,
+        wordWrap='CJK'
+    )
+    
     banking_text = f"<b>BANKING INSTRUCTIONS</b><br/>"
     banking_text += f"<b>Bank Name:</b> {profile['bank_name']}<br/>"
     banking_text += f"<b>Account No:</b> {profile['account_number']}<br/>"
@@ -588,7 +596,7 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
         banking_text += f"<br/><b>SWIFT Code:</b> {profile['swift_code']}"
     banking_text += "<br/><br/><b>Declaration:</b> We hereby declare that the above information is true and correct and that the goods are of Indian origin."
     
-    # Right Side: Signature Box - Build as nested table to avoid KeepTogether issues
+    # Right Side: Signature Box
     sig_header = Paragraph(f"<b>For {profile['company_name']}</b>", 
                           ParagraphStyle('SigHeader', parent=styles['Normal'], 
                                        fontSize=10, alignment=TA_CENTER))
@@ -622,7 +630,7 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
     ]))
     
     footer_data = [[
-        Paragraph(banking_text, styles['Normal']),
+        Paragraph(banking_text, banking_style),
         sig_table
     ]]
     
