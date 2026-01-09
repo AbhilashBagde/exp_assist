@@ -25,6 +25,7 @@ function NewShipment() {
   });
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
+  const [generatedShipmentId, setGeneratedShipmentId] = useState(null);
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
 
