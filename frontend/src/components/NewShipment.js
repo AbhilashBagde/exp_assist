@@ -29,11 +29,15 @@ function NewShipment() {
   const [generatedShipmentId, setGeneratedShipmentId] = useState(null);
   const [suggestingHsCode, setSuggestingHsCode] = useState(null);
   const [exchangeRate, setExchangeRate] = useState(83.50); // Default USD to INR
+  const [exchangeRates, setExchangeRates] = useState({}); // All rates
+  const [ratesLoading, setRatesLoading] = useState(false);
+  const [isLiveRate, setIsLiveRate] = useState(false);
+  const [ratesLastUpdated, setRatesLastUpdated] = useState(null);
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
 
-  // Exchange rates to INR
-  const EXCHANGE_RATES = {
+  // Fallback exchange rates to INR
+  const FALLBACK_RATES = {
     USD: 83.50,
     EUR: 90.50,
     GBP: 105.50,
@@ -42,9 +46,40 @@ function NewShipment() {
     INR: 1.00
   };
 
+  // Fetch live exchange rates from API
+  const fetchExchangeRates = async () => {
+    setRatesLoading(true);
+    try {
+      const response = await axios.get(`${API_URL}/api/exchange-rates`);
+      if (response.data.rates) {
+        setExchangeRates(response.data.rates);
+        setIsLiveRate(response.data.is_live);
+        setRatesLastUpdated(response.data.last_updated);
+        // Update current exchange rate based on selected currency
+        const rate = response.data.rates[formData.currency] || FALLBACK_RATES[formData.currency] || 83.50;
+        setExchangeRate(rate);
+      }
+    } catch (err) {
+      console.error('Failed to fetch exchange rates:', err);
+      setExchangeRates(FALLBACK_RATES);
+      setExchangeRate(FALLBACK_RATES[formData.currency] || 83.50);
+      setIsLiveRate(false);
+    } finally {
+      setRatesLoading(false);
+    }
+  };
+
+  // Fetch rates on component mount
+  React.useEffect(() => {
+    if (token) {
+      fetchExchangeRates();
+    }
+  }, [token]);
+
   // Update exchange rate when currency changes
   const updateExchangeRate = (currency) => {
-    setExchangeRate(EXCHANGE_RATES[currency] || 83.50);
+    const rate = exchangeRates[currency] || FALLBACK_RATES[currency] || 83.50;
+    setExchangeRate(rate);
   };
 
   // Step A: File Upload
