@@ -21,14 +21,31 @@ function NewShipment() {
     incoterms: 'FOB',
     total_packages: 1,
     package_type: 'BOXES',
+    include_inr_column: false,
     items: []
   });
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
   const [generatedShipmentId, setGeneratedShipmentId] = useState(null);
-  const [suggestingHsCode, setSuggestingHsCode] = useState(null); // Track which item index is being suggested
+  const [suggestingHsCode, setSuggestingHsCode] = useState(null);
+  const [exchangeRate, setExchangeRate] = useState(83.50); // Default USD to INR
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
+
+  // Exchange rates to INR
+  const EXCHANGE_RATES = {
+    USD: 83.50,
+    EUR: 90.50,
+    GBP: 105.50,
+    AED: 22.75,
+    SGD: 62.00,
+    INR: 1.00
+  };
+
+  // Update exchange rate when currency changes
+  const updateExchangeRate = (currency) => {
+    setExchangeRate(EXCHANGE_RATES[currency] || 83.50);
+  };
 
   // Step A: File Upload
   const handleFileChange = (e) => {
