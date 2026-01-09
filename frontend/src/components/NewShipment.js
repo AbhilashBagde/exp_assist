@@ -202,13 +202,19 @@ function NewShipment() {
       );
 
       // Download PDF
-      const url = window.URL.createObjectURL(new Blob([pdfResponse.data]));
+      const url = window.URL.createObjectURL(new Blob([pdfResponse.data], { type: 'application/pdf' }));
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `invoice_${shipmentId}.pdf`);
+      link.style.display = 'none';
       document.body.appendChild(link);
       link.click();
-      link.remove();
+      
+      // Cleanup after small delay to ensure download starts
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
 
       setStep(4); // Success step
     } catch (err) {
