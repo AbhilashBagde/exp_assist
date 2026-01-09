@@ -217,6 +217,7 @@ function NewShipment() {
         window.URL.revokeObjectURL(url);
       }, 100);
 
+      setGeneratedShipmentId(shipmentId);
       setStep(4); // Success step
     } catch (err) {
       // Handle error - ensure it's a string, not an object
