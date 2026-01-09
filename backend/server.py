@@ -367,7 +367,7 @@ async def create_shipment(
         "incoterms": incoterms,
         "total_packages": total_packages,
         "package_type": package_type,
-        "include_inr_column": include_inr_column,
+        "include_inr_column": include_inr_bool,
         "status": "Draft",
         "items": items_list,
         "created_at": datetime.utcnow()
