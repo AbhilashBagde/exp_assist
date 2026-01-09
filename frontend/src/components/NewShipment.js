@@ -870,9 +870,33 @@ function NewShipment() {
                         <p className="text-sm text-green-800">
                           <strong>Total in INR:</strong> ₹{(formData.items.reduce((sum, item) => sum + item.total_amount, 0) * exchangeRate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
-                        <p className="text-xs text-green-600 mt-1">
-                          Exchange Rate: 1 {formData.currency} = ₹{exchangeRate.toFixed(2)}
-                        </p>
+                        <div className="flex items-center space-x-2 mt-1">
+                          <p className="text-xs text-green-600">
+                            Exchange Rate: 1 {formData.currency} = ₹{exchangeRate.toFixed(2)}
+                          </p>
+                          {isLiveRate ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-200 text-green-800">
+                              🟢 Live Rate
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-200 text-yellow-800">
+                              ⚠️ Fallback Rate
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={fetchExchangeRates}
+                            disabled={ratesLoading}
+                            className="text-xs text-blue-600 hover:text-blue-800 underline disabled:opacity-50"
+                          >
+                            {ratesLoading ? 'Refreshing...' : 'Refresh'}
+                          </button>
+                        </div>
+                        {ratesLastUpdated && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Last updated: {new Date(ratesLastUpdated).toLocaleString()}
+                          </p>
+                        )}
                       </div>
                       <label className="flex items-center space-x-2 cursor-pointer">
                         <input
