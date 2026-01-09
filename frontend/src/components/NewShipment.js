@@ -605,10 +605,11 @@ function NewShipment() {
                   <button
                     type="button"
                     onClick={addItem}
-                    className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors text-sm"
+                    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center space-x-2"
                     data-testid="add-item-button"
                   >
-                    + Add Item
+                    <span className="text-xl">+</span>
+                    <span>Add Item</span>
                   </button>
                 </div>
 
