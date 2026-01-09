@@ -743,25 +743,54 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
     # Table header style
     table_header_style = ParagraphStyle('TableHeader', parent=styles['Normal'], fontSize=9, textColor=colors.whitesmoke)
     
+    # Check if INR column should be included
+    include_inr = shipment.get('include_inr_column', False) and currency != 'INR'
+    inr_rate = get_inr_rate(currency) if include_inr else 1
+    
     # Create items table with repeatRows for header on each page
-    items_data = [[
-        Paragraph('<b>Description</b>', table_header_style),
-        Paragraph('<b>HS Code</b>', table_header_style),
-        Paragraph('<b>Qty</b>', table_header_style),
-        Paragraph(f'<b>Rate ({currency})</b>', table_header_style),
-        Paragraph(f'<b>Amount ({currency})</b>', table_header_style)
-    ]]
-    
-    for item in shipment['items']:
-        items_data.append([
-            item['description'],
-            item['hs_code'],
-            str(item['quantity']),
-            f"{item['unit_price']:.2f}",
-            f"{item['total_amount']:,.2f}"
-        ])
-    
-    items_table = Table(items_data, colWidths=[3*inch, 1*inch, 0.7*inch, 1.15*inch, 1.65*inch], repeatRows=1)
+    if include_inr:
+        items_data = [[
+            Paragraph('<b>Description</b>', table_header_style),
+            Paragraph('<b>HS Code</b>', table_header_style),
+            Paragraph('<b>Qty</b>', table_header_style),
+            Paragraph(f'<b>Rate ({currency})</b>', table_header_style),
+            Paragraph(f'<b>Amount ({currency})</b>', table_header_style),
+            Paragraph('<b>Amount (INR)</b>', table_header_style)
+        ]]
+        
+        total_inr = 0
+        for item in shipment['items']:
+            inr_amount = item['total_amount'] * inr_rate
+            total_inr += inr_amount
+            items_data.append([
+                item['description'],
+                item['hs_code'],
+                str(item['quantity']),
+                f"{item['unit_price']:.2f}",
+                f"{item['total_amount']:,.2f}",
+                f"₹{inr_amount:,.2f}"
+            ])
+        
+        items_table = Table(items_data, colWidths=[2.4*inch, 0.9*inch, 0.6*inch, 1*inch, 1.1*inch, 1.5*inch], repeatRows=1)
+    else:
+        items_data = [[
+            Paragraph('<b>Description</b>', table_header_style),
+            Paragraph('<b>HS Code</b>', table_header_style),
+            Paragraph('<b>Qty</b>', table_header_style),
+            Paragraph(f'<b>Rate ({currency})</b>', table_header_style),
+            Paragraph(f'<b>Amount ({currency})</b>', table_header_style)
+        ]]
+        
+        for item in shipment['items']:
+            items_data.append([
+                item['description'],
+                item['hs_code'],
+                str(item['quantity']),
+                f"{item['unit_price']:.2f}",
+                f"{item['total_amount']:,.2f}"
+            ])
+        
+        items_table = Table(items_data, colWidths=[3*inch, 1*inch, 0.7*inch, 1.15*inch, 1.65*inch], repeatRows=1)
     items_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0f172a')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
