@@ -409,6 +409,88 @@ Return ONLY the JSON object, no additional text."""
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Extraction failed: {str(e)}")
 
+# AI HS Code Suggestion Endpoint
+@app.post("/api/suggest-hs-code")
+async def suggest_hs_code(
+    user_id: str = Depends(verify_token),
+    description: str = Form(...)
+):
+    if not GEMINI_API_KEY:
+        raise HTTPException(status_code=500, detail="Gemini API key not configured")
+    
+    if not description or len(description.strip()) < 3:
+        raise HTTPException(status_code=400, detail="Please provide a valid item description")
+    
+    try:
+        model = genai.GenerativeModel('models/gemini-2.5-flash')
+        
+        prompt = f"""You are an expert in Indian ITC-HS Code classification for export goods.
+
+Based on the following product description, predict the most appropriate Indian ITC-HS Code (6 or 8 digits).
+
+Product Description: "{description}"
+
+Respond with ONLY a JSON object in this exact format:
+{{
+  "hs_code": "XXXX.XX",
+  "confidence": "high/medium/low",
+  "category": "Brief category name",
+  "notes": "Brief explanation of why this code was chosen"
+}}
+
+Common HS Code examples for reference:
+- Basmati Rice: 1006.30
+- Cotton Fabric: 5208.00
+- Tea: 0902.00
+- Spices (Turmeric): 0910.30
+- Leather goods: 4202.00
+- Textiles/Garments: 6109.00
+- Machinery parts: 8479.00
+- Chemicals: 2933.00
+- Pharmaceuticals: 3004.00
+- Jewelry: 7113.00
+
+Return ONLY the JSON object, no additional text."""
+
+        response = model.generate_content(prompt)
+        result_text = response.text.strip()
+        
+        # Clean up response
+        if result_text.startswith('```json'):
+            result_text = result_text[7:]
+        if result_text.startswith('```'):
+            result_text = result_text[3:]
+        if result_text.endswith('```'):
+            result_text = result_text[:-3]
+        result_text = result_text.strip()
+        
+        # Parse JSON
+        suggestion = json.loads(result_text)
+        
+        return {
+            "success": True,
+            "hs_code": suggestion.get("hs_code", ""),
+            "confidence": suggestion.get("confidence", "medium"),
+            "category": suggestion.get("category", ""),
+            "notes": suggestion.get("notes", "")
+        }
+        
+    except json.JSONDecodeError:
+        # If JSON parsing fails, try to extract HS code from text
+        import re
+        hs_match = re.search(r'\d{4}\.\d{2}', response.text if 'response' in dir() else '')
+        if hs_match:
+            return {
+                "success": True,
+                "hs_code": hs_match.group(),
+                "confidence": "low",
+                "category": "",
+                "notes": "Extracted from AI response"
+            }
+        raise HTTPException(status_code=500, detail="Failed to parse AI response")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"HS Code suggestion failed: {str(e)}")
+
 # PDF Generation Endpoint
 @app.post("/api/shipments/{shipment_id}/generate-pdf")
 async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_token)):
