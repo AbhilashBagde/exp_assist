@@ -64,7 +64,7 @@ if GEMINI_API_KEY:
 security = HTTPBearer()
 
 # Create uploads directory
-UPLOADS_DIR = Path("/app/backend/uploads")
+UPLOADS_DIR = Path("uploads")
 UPLOADS_DIR.mkdir(exist_ok=True)
 
 # Fallback Exchange Rates to INR (used when API fails)
