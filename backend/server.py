@@ -26,6 +26,7 @@ from reportlab.platypus.frames import Frame
 from PIL import Image as PILImage
 from pdf2image import convert_from_bytes
 import uuid
+import certifi
 
 # Load environment variables
 load_dotenv()
@@ -41,7 +42,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-import certifi  # <--- Add this import
+  # <--- Add this import
 # MongoDB Connection
 MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017/exportassist")
 
