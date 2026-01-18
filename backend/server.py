@@ -41,9 +41,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+import certifi  # <--- Add this import
 # MongoDB Connection
 MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017/exportassist")
-client = MongoClient(MONGO_URL)
+
+# Add tlsCAFile=certifi.where() to fix the SSL Handshake error
+client = MongoClient(MONGO_URL, tlsCAFile=certifi.where()) 
 db = client.exportassist
 
 # Collections
