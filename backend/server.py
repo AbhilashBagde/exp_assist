@@ -700,8 +700,6 @@ async def suggest_hs_code(
         raise HTTPException(status_code=400, detail="Please provide a valid item description")
     
     try:
-        model = genai.GenerativeModel('models/gemini-2.5-flash')
-        
         prompt = f"""You are an expert in Indian ITC-HS Code classification for export goods.
 
 Based on the following product description, predict the most appropriate Indian ITC-HS Code (6 or 8 digits).
@@ -730,7 +728,22 @@ Common HS Code examples for reference:
 
 Return ONLY the JSON object, no additional text."""
 
-        response = model.generate_content(prompt)
+        # Try models in order; fall back to next if rate-limited (429)
+        models_to_try = ['models/gemini-2.0-flash', 'models/gemini-2.5-flash', 'models/gemini-1.5-flash']
+        response = None
+        last_error = None
+        for model_name in models_to_try:
+            try:
+                m = genai.GenerativeModel(model_name)
+                response = m.generate_content(prompt)
+                break
+            except Exception as e:
+                last_error = e
+                if '429' not in str(e) and 'quota' not in str(e).lower():
+                    raise  # Only fall back for rate-limit errors
+                continue
+        if response is None:
+            raise last_error
         result_text = response.text.strip()
         
         # Clean up response
