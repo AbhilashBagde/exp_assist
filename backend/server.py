@@ -1252,7 +1252,7 @@ async def validate_shipment(shipment_id: str, user_id: str = Depends(verify_toke
         desc_preview = (item.get('description', '') or '')[:30]
         if not re.match(r'^\d{8}$', hs):
             errors.append(
-                f"Item {idx + 1} ("{desc_preview}"): HS code must be exactly 8 digits with no dots or spaces (current value: "{hs}")."
+                f"Item {idx + 1} ('{desc_preview}'): HS code must be exactly 8 digits with no dots or spaces (current value: '{hs}')."
             )
         else:
             passed_checks += 1
@@ -1302,21 +1302,21 @@ async def validate_shipment(shipment_id: str, user_id: str = Depends(verify_toke
         # unit_of_measure
         total_checks += 1
         if not (item.get('unit_of_measure', '') or ''):
-            warnings.append(f"Item {idx + 1} ("{desc_preview}"): unit of measure is not set.")
+            warnings.append(f"Item {idx + 1} ('{desc_preview}'): unit of measure is not set.")
         else:
             passed_checks += 1
 
         # gross_weight
         total_checks += 1
         if float(item.get('gross_weight', 0) or 0) == 0:
-            warnings.append(f"Item {idx + 1} ("{desc_preview}"): gross weight is 0.")
+            warnings.append(f"Item {idx + 1} ('{desc_preview}'): gross weight is 0.")
         else:
             passed_checks += 1
 
         # quantity
         total_checks += 1
         if float(item.get('quantity', 0) or 0) == 0:
-            warnings.append(f"Item {idx + 1} ("{desc_preview}"): quantity is 0.")
+            warnings.append(f"Item {idx + 1} ('{desc_preview}'): quantity is 0.")
         else:
             passed_checks += 1
 
