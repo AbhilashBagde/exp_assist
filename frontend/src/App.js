@@ -1,28 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import axios from 'axios';
 import './App.css';
 import Dashboard from './components/Dashboard';
 import Settings from './components/Settings';
 import NewShipment from './components/NewShipment';
 import Upgrade from './components/Upgrade';
+import Login from './components/Login';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+function PrivateRoute({ children }) {
+  const token = localStorage.getItem('token');
+  return token ? children : <Navigate to="/login" replace />;
+}
 
 function App() {
   const [ready, setReady] = useState(!!localStorage.getItem('token'));
 
   useEffect(() => {
-    if (!localStorage.getItem('token')) {
-      axios.post(`${API_URL}/api/auth/auto-session`, {}, { timeout: 8000 })
-        .then(res => {
-          localStorage.setItem('token', res.data.token);
-          localStorage.setItem('user_id', res.data.user_id);
-          localStorage.setItem('is_pro_member', String(res.data.is_pro_member));
-        })
-        .catch(err => console.error('Auto-session failed:', err))
-        .finally(() => setReady(true));
-    }
+    // If already authenticated, no need to do anything
+    if (localStorage.getItem('token')) return;
+    setReady(true);
   }, []);
 
   if (!ready) {
@@ -37,11 +33,13 @@ function App() {
     <Router>
       <div className="App">
         <Routes>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/new-shipment" element={<NewShipment />} />
-          <Route path="/upgrade" element={<Upgrade />} />
-          <Route path="/" element={<Navigate to="/dashboard" />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Login isSignup />} />
+          <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+          <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
+          <Route path="/new-shipment" element={<PrivateRoute><NewShipment /></PrivateRoute>} />
+          <Route path="/upgrade" element={<PrivateRoute><Upgrade /></PrivateRoute>} />
+          <Route path="/" element={<Navigate to="/login" replace />} />
         </Routes>
       </div>
     </Router>

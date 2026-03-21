@@ -69,7 +69,7 @@ function Dashboard() {
 
   const handleLogout = () => {
     localStorage.clear();
-    window.location.href = '/';
+    window.location.href = '/login';
   };
 
   const getTotalValue = (items) => {
