@@ -14,7 +14,7 @@ function App() {
 
   useEffect(() => {
     if (!localStorage.getItem('token')) {
-      axios.post(`${API_URL}/api/auth/auto-session`)
+      axios.post(`${API_URL}/api/auth/auto-session`, {}, { timeout: 8000 })
         .then(res => {
           localStorage.setItem('token', res.data.token);
           localStorage.setItem('user_id', res.data.user_id);
