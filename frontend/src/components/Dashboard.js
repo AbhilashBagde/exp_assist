@@ -32,7 +32,7 @@ function Dashboard() {
       console.error('Error checking profile:', err);
       if (err.response?.status === 401) {
         localStorage.clear();
-        navigate('/login');
+        window.location.href = '/';
       }
     }
   }, [token, navigate]);
@@ -55,7 +55,7 @@ function Dashboard() {
       console.error('Error fetching shipments:', err);
       if (err.response?.status === 401) {
         localStorage.clear();
-        navigate('/login');
+        window.location.href = '/';
       }
     } finally {
       setLoading(false);
@@ -69,7 +69,7 @@ function Dashboard() {
 
   const handleLogout = () => {
     localStorage.clear();
-    navigate('/login');
+    window.location.href = '/';
   };
 
   const getTotalValue = (items) => {

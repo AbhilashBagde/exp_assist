@@ -169,7 +169,7 @@ function NewShipment() {
       setError(errorMessage);
       if (err.response?.status === 401) {
         localStorage.clear();
-        navigate('/login');
+        window.location.href = '/';
       }
     } finally {
       setExtracting(false);
@@ -364,7 +364,7 @@ function NewShipment() {
       setError(errorMessage);
       if (err.response?.status === 401) {
         localStorage.clear();
-        navigate('/login');
+        window.location.href = '/';
       }
     } finally {
       setGenerating(false);

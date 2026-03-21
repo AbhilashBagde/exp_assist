@@ -41,7 +41,7 @@ function Settings() {
       console.error('Error fetching profile:', err);
       if (err.response?.status === 401) {
         localStorage.clear();
-        navigate('/login');
+        window.location.href = '/';
       }
     }
   }, [token, navigate]);

@@ -203,6 +203,26 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) 
         raise HTTPException(status_code=401, detail="Invalid token")
 
 # Auth Endpoints
+@app.post("/api/auth/auto-session")
+async def auto_session():
+    """Single-user auto-authentication — creates default user on first run and returns a JWT."""
+    DEFAULT_USER_ID = "default_user"
+    DEFAULT_EMAIL = "admin@local"
+
+    user = users_collection.find_one({"_id": DEFAULT_USER_ID})
+    if not user:
+        users_collection.insert_one({
+            "_id": DEFAULT_USER_ID,
+            "email": DEFAULT_EMAIL,
+            "password_hash": b"",
+            "is_pro_member": True,
+            "created_at": datetime.utcnow()
+        })
+
+    token = create_token(DEFAULT_USER_ID)
+    return {"token": token, "user_id": DEFAULT_USER_ID, "is_pro_member": True}
+
+
 @app.post("/api/auth/signup")
 async def signup(email: str = Form(...), password: str = Form(...)):
     if users_collection.find_one({"email": email}):
