@@ -75,6 +75,13 @@ users_collection = db.users
 profiles_collection = db.company_profiles
 shipments_collection = db.shipments
 
+# Indexes (idempotent — safe to run on every startup)
+users_collection.create_index("email", unique=True, background=True)
+profiles_collection.create_index("user_id", unique=True, background=True)
+shipments_collection.create_index("user_id", background=True)
+shipments_collection.create_index("po_number", background=True)
+shipments_collection.create_index([("user_id", 1), ("created_at", -1)], background=True)
+
 # JWT Configuration
 JWT_SECRET = os.getenv("JWT_SECRET", "your-secret-key-change-in-production")
 JWT_ALGORITHM = "HS256"
@@ -235,7 +242,7 @@ async def signup(email: str = Form(...), password: str = Form(...)):
         "_id": user_id,
         "email": email,
         "password_hash": password_hash,
-        "is_pro_member": True,  # Pro trial enabled for all accounts
+        "is_pro_member": False,
         "created_at": datetime.utcnow()
     })
     
@@ -373,6 +380,11 @@ async def upload_signature(
     
     return {"success": True, "signature_url": signature_url}
 
+# Next Invoice Number Endpoint
+@app.get("/api/next-invoice-number")
+async def next_invoice_number(user_id: str = Depends(verify_token)):
+    return {"invoice_number": get_next_invoice_number(user_id)}
+
 # Shipments Endpoints
 @app.get("/api/shipments")
 async def get_shipments(user_id: str = Depends(verify_token)):
@@ -411,15 +423,16 @@ async def create_shipment(
     notify_party: str = Form(""),
     payment_terms: str = Form(""),
     marks_and_numbers: str = Form(""),
-    tariff_code: str = Form("")
+    tariff_code: str = Form(""),
+    invoice_number_override: str = Form("")
 ):
     items_list = json.loads(items)
 
     # Parse include_inr_column as boolean
     include_inr_bool = include_inr_column.lower() in ('true', '1', 'yes')
 
-    # Auto-generate invoice number
-    invoice_number = get_next_invoice_number(user_id)
+    # Use user-supplied invoice number or auto-generate
+    invoice_number = invoice_number_override.strip() if invoice_number_override.strip() else get_next_invoice_number(user_id)
 
     shipment_id = str(uuid.uuid4())
     shipment_data = {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Upload, FileText, CheckCircle, ArrowLeft, Loader, AlertCircle, Edit, Sparkles } from 'lucide-react';
 import axios from 'axios';
@@ -33,6 +33,9 @@ function NewShipment() {
   const [error, setError] = useState('');
   const [generatedShipmentId, setGeneratedShipmentId] = useState(null);
   const [suggestingHsCode, setSuggestingHsCode] = useState(null);
+  const [suggestingAll, setSuggestingAll] = useState(false);
+  const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [profileWarning, setProfileWarning] = useState('');
   const [exchangeRate, setExchangeRate] = useState(83.50); // Default USD to INR
   const [exchangeRates, setExchangeRates] = useState({}); // All rates
   const [ratesLoading, setRatesLoading] = useState(false);
@@ -80,6 +83,46 @@ function NewShipment() {
       fetchExchangeRates();
     }
   }, [token]);
+
+  // Restore draft from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('shipment_draft');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setFormData(parsed);
+        setStep(3);
+      } catch (_) {}
+    }
+  }, []);
+
+  // Auto-save draft whenever form data changes (only on step 3)
+  useEffect(() => {
+    if (step === 3) {
+      localStorage.setItem('shipment_draft', JSON.stringify(formData));
+    }
+  }, [formData, step]);
+
+  // Fetch next invoice number and check profile when entering step 3
+  useEffect(() => {
+    if (step !== 3) return;
+    // Fetch suggested invoice number
+    axios.get(`${API_URL}/api/next-invoice-number`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then(res => setInvoiceNumber(res.data.invoice_number)).catch(() => {});
+    // Check profile completeness
+    axios.get(`${API_URL}/api/profile`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then(res => {
+      const p = res.data;
+      const missing = [];
+      if (!p.exists) { setProfileWarning('Company profile is incomplete. Your invoice will have blank exporter details. Go to Settings to fill it in.'); return; }
+      if (!p.bank_account_number) missing.push('bank account');
+      if (!p.swift_code) missing.push('SWIFT code');
+      if (!p.iec_code) missing.push('IEC code');
+      if (missing.length) setProfileWarning(`Profile missing: ${missing.join(', ')}. These fields will be blank on the invoice.`);
+    }).catch(() => {});
+  }, [step, token]);
 
   // Update exchange rate when currency changes
   const updateExchangeRate = (currency) => {
@@ -285,6 +328,40 @@ function NewShipment() {
     }
   };
 
+  // Suggest HS codes for all items without one
+  const suggestAllHsCodes = async () => {
+    const itemsNeedingCodes = formData.items
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => !item.hs_code && item.description?.trim().length >= 3);
+
+    if (itemsNeedingCodes.length === 0) {
+      setError('All items already have HS codes.');
+      return;
+    }
+
+    setSuggestingAll(true);
+    setError('');
+    let updatedItems = [...formData.items];
+
+    for (const { item, index } of itemsNeedingCodes) {
+      setSuggestingHsCode(index);
+      try {
+        const fd = new FormData();
+        fd.append('description', item.description);
+        const response = await axios.post(`${API_URL}/api/suggest-hs-code`, fd, {
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
+        });
+        if (response.data.success) {
+          updatedItems[index] = { ...updatedItems[index], hs_code: response.data.hs_code };
+        }
+      } catch (_) {}
+    }
+
+    setFormData({ ...formData, items: updatedItems });
+    setSuggestingHsCode(null);
+    setSuggestingAll(false);
+  };
+
   // Step D: Save & Generate PDF
   const handleSaveAndGenerate = async () => {
     setGenerating(true);
@@ -310,6 +387,7 @@ function NewShipment() {
       shipmentFormData.append('package_type', formData.package_type);
       shipmentFormData.append('include_inr_column', formData.include_inr_column ? 'true' : 'false');
       shipmentFormData.append('items', JSON.stringify(formData.items));
+      if (invoiceNumber) shipmentFormData.append('invoice_number_override', invoiceNumber);
 
       const createResponse = await axios.post(`${API_URL}/api/shipments`, shipmentFormData, {
         headers: {
@@ -346,6 +424,7 @@ function NewShipment() {
       }, 100);
 
       setGeneratedShipmentId(shipmentId);
+      localStorage.removeItem('shipment_draft'); // Clear saved draft on success
       setStep(4); // Success step
     } catch (err) {
       // Handle error - ensure it's a string, not an object
@@ -560,7 +639,33 @@ function NewShipment() {
             </h2>
             <p className="text-slate mb-6">Please verify the extracted information and make any necessary corrections</p>
 
+            {/* Profile warning */}
+            {profileWarning && (
+              <div className="bg-yellow-50 border border-yellow-300 text-yellow-800 px-4 py-3 rounded mb-4 flex items-start space-x-2">
+                <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                <span className="text-sm">{profileWarning}</span>
+              </div>
+            )}
+
             <form onSubmit={(e) => { e.preventDefault(); handleSaveAndGenerate(); }} data-testid="review-form">
+              {/* Invoice Number */}
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-navy mb-3">Invoice Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-gray-700 text-sm font-medium mb-2">Invoice Number</label>
+                    <input
+                      type="text"
+                      value={invoiceNumber}
+                      onChange={(e) => setInvoiceNumber(e.target.value)}
+                      placeholder="Auto-generated on save"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy bg-gray-50"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Leave blank to auto-assign the next number</p>
+                  </div>
+                </div>
+              </div>
+
               {/* Buyer Details */}
               <div className="mb-6">
                 <h3 className="text-lg font-semibold text-navy mb-3">Buyer Information</h3>
@@ -801,15 +906,27 @@ function NewShipment() {
               <div className="mb-6">
                 <div className="flex justify-between items-center mb-3">
                   <h3 className="text-lg font-semibold text-navy">Items</h3>
-                  <button
-                    type="button"
-                    onClick={addItem}
-                    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center space-x-2"
-                    data-testid="add-item-button"
-                  >
-                    <span className="text-xl">+</span>
-                    <span>Add Item</span>
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={suggestAllHsCodes}
+                      disabled={suggestingAll}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium flex items-center space-x-2 disabled:opacity-50 disabled:cursor-wait text-sm"
+                      title="AI suggest HS codes for all items missing one"
+                    >
+                      {suggestingAll ? <Loader className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                      <span>{suggestingAll ? 'Suggesting...' : 'Suggest All HS Codes'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={addItem}
+                      className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center space-x-2"
+                      data-testid="add-item-button"
+                    >
+                      <span className="text-xl">+</span>
+                      <span>Add Item</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto">
