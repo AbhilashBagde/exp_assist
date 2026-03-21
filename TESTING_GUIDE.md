@@ -1,4 +1,4 @@
-# ExportAssist - Testing & Verification Guide
+# TradesdocAi - Testing & Verification Guide
 
 ## Quick Test Checklist
 
@@ -17,7 +17,7 @@ sudo supervisorctl status
 ### ✅ Step 2: Access the Application
 
 1. Open your browser and go to: **http://localhost:3000**
-2. You should see the ExportAssist login page
+2. You should see the TradesdocAi login page
 
 ### ✅ Step 3: Create an Account
 
@@ -57,7 +57,7 @@ Click **"Save Profile"** - You should see a success message and be redirected to
 
 1. You should now see the Dashboard
 2. Verify these elements are present:
-   - ExportAssist header with logo
+   - TradesdocAi header with logo
    - "New Shipment" button (green, top-right)
    - "Settings" button
    - "Logout" button
@@ -168,7 +168,7 @@ Click **"Save Profile"** - You should see a success message and be redirected to
 ### Test 1: Health Check
 ```bash
 curl http://localhost:8001/api/health
-# Expected: {"status":"healthy","service":"ExportAssist API"}
+# Expected: {"status":"healthy","service":"TradesdocAi API"}
 ```
 
 ### Test 2: User Signup

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Building, CreditCard, Upload, Save, ArrowLeft } from 'lucide-react';
+import { Building, CreditCard, Upload, Save, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -120,8 +120,8 @@ function Settings() {
       <header className="bg-navy text-white shadow-lg" data-testid="settings-header">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center space-x-3">
-            <Package className="w-8 h-8" />
-            <h1 className="text-2xl font-bold">ExportAssist</h1>
+            <img src="/TDA.png" alt="TradesdocAi Logo" className="w-8 h-8 rounded-full object-contain" />
+            <h1 className="text-2xl font-bold">TradesdocAi</h1>
           </div>
         </div>
       </header>

@@ -1,9 +1,9 @@
 #!/bin/bash
-# Script to clear all test data from ExportAssist database
+# Script to clear all test data from TradesdocAi database
 
-echo "🗑️  Clearing ExportAssist database..."
+echo "🗑️  Clearing TradesdocAi database..."
 
-mongosh exportassist --quiet --eval "
+mongosh tradesdocai --quiet --eval "
   db.users.deleteMany({});
   db.company_profiles.deleteMany({});
   db.shipments.deleteMany({});

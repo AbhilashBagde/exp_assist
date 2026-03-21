@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Check, Lock, ArrowLeft, ExternalLink } from 'lucide-react';
+import { Check, Lock, ArrowLeft, ExternalLink } from 'lucide-react';
 
 function Upgrade() {
   const navigate = useNavigate();
@@ -12,8 +12,8 @@ function Upgrade() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <Package className="w-8 h-8" />
-              <h1 className="text-2xl font-bold">ExportAssist</h1>
+              <img src="/TDA.png" alt="TradesdocAi Logo" className="w-8 h-8 rounded-full object-contain" />
+              <h1 className="text-2xl font-bold">TradesdocAi</h1>
             </div>
             <button
               onClick={() => navigate('/dashboard')}
@@ -31,7 +31,7 @@ function Upgrade() {
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="text-center mb-12">
           <h2 className="text-4xl font-bold text-white mb-4" data-testid="page-title">
-            Upgrade to ExportAssist Pro
+            Upgrade to TradesdocAi Pro
           </h2>
           <p className="text-xl text-gray-300">
             Unlock premium features and scale your export business

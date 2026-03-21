@@ -15,7 +15,7 @@ cd /app/scripts
 
 **Option 2: Manual Database Clear**
 ```bash
-mongosh exportassist --eval "db.users.deleteMany({}); db.company_profiles.deleteMany({}); db.shipments.deleteMany({});"
+mongosh tradesdocai --eval "db.users.deleteMany({}); db.company_profiles.deleteMany({}); db.shipments.deleteMany({});"
 ```
 
 **Option 3: Use a Different Email**
@@ -125,7 +125,7 @@ curl http://localhost:3000
 
 Expected output:
 - All services: `RUNNING`
-- Backend health: `{"status":"healthy","service":"ExportAssist API"}`
+- Backend health: `{"status":"healthy","service":"TradesdocAi API"}`
 - Frontend: HTML content
 
 ---

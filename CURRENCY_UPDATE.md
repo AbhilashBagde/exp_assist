@@ -1,9 +1,9 @@
-# Currency Formatting Update - ExportAssist v2.0.1
+# Currency Formatting Update - TradesdocAi v2.0.1
 
 ## 🎨 Professional UI & PDF Currency Display
 
 ### Overview
-Updated ExportAssist to use professional, clean currency formatting across all interfaces and generated documents. Currency symbols are now in headers instead of individual cells for a cleaner, more scalable appearance.
+Updated TradesdocAi to use professional, clean currency formatting across all interfaces and generated documents. Currency symbols are now in headers instead of individual cells for a cleaner, more scalable appearance.
 
 ---
 

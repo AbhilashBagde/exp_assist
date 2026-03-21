@@ -1,6 +1,6 @@
 # Getting Your Gemini API Key
 
-To use the AI Vision features of ExportAssist, you need a Google Gemini API key.
+To use the AI Vision features of TradesdocAi, you need a Google Gemini API key.
 
 ## Steps to Get Gemini API Key
 
@@ -17,7 +17,7 @@ Go to: https://makersuite.google.com/app/apikey
 - Select an existing Google Cloud project or create a new one
 - Copy the generated API key
 
-### 4. Configure ExportAssist
+### 4. Configure TradesdocAi
 
 Open `/app/backend/.env` file and update:
 ```

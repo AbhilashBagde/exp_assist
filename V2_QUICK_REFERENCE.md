@@ -1,4 +1,4 @@
-# ExportAssist v2.0 - Quick Reference Guide
+# TradesdocAi v2.0 - Quick Reference Guide
 
 ## 🆕 What's New in Version 2.0?
 
@@ -262,4 +262,4 @@ PO-2025-001, 2025-01-08, INNSA1, 135500.00, 135500.00, 0.00
 
 ---
 
-**ExportAssist v2.0 - Your Complete Export Business Solution** 🚀
+**TradesdocAi v2.0 - Your Complete Export Business Solution** 🚀

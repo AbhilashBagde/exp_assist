@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Upload, FileText, CheckCircle, ArrowLeft, Loader, AlertCircle, Edit, Sparkles } from 'lucide-react';
+import { Upload, FileText, CheckCircle, ArrowLeft, Loader, AlertCircle, Edit, Sparkles } from 'lucide-react';
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -13,6 +13,9 @@ function NewShipment() {
   const [formData, setFormData] = useState({
     buyer_name: '',
     buyer_address: '',
+    consignee: '',
+    notify_party: '',
+    payment_terms: '',
     po_number: '',
     po_date: '',
     currency: 'USD',
@@ -22,6 +25,8 @@ function NewShipment() {
     total_packages: 1,
     package_type: 'BOXES',
     include_inr_column: false,
+    marks_and_numbers: '',
+    tariff_code: '',
     items: []
   });
   const [generating, setGenerating] = useState(false);
@@ -191,8 +196,8 @@ function NewShipment() {
     const updatedItems = [...formData.items];
     updatedItems[index] = {
       ...updatedItems[index],
-      [field]: (field === 'quantity' || field === 'unit_price' || field === 'net_weight' || field === 'gross_weight') 
-        ? parseFloat(value) || 0 
+      [field]: (field === 'quantity' || field === 'unit_price' || field === 'net_weight' || field === 'gross_weight' || field === 'length_cm' || field === 'width_cm' || field === 'height_cm')
+        ? parseFloat(value) || 0
         : value
     };
     
@@ -207,14 +212,18 @@ function NewShipment() {
   const addItem = () => {
     setFormData({
       ...formData,
-      items: [...formData.items, { 
-        description: '', 
-        quantity: 0, 
-        unit_price: 0, 
-        hs_code: '', 
+      items: [...formData.items, {
+        description: '',
+        quantity: 0,
+        unit_of_measure: '',
+        unit_price: 0,
+        hs_code: '',
         total_amount: 0,
         net_weight: 0,
-        gross_weight: 0
+        gross_weight: 0,
+        length_cm: 0,
+        width_cm: 0,
+        height_cm: 0
       }]
     });
   };
@@ -286,6 +295,11 @@ function NewShipment() {
       const shipmentFormData = new FormData();
       shipmentFormData.append('buyer_name', formData.buyer_name);
       shipmentFormData.append('buyer_address', formData.buyer_address);
+      shipmentFormData.append('consignee', formData.consignee || '');
+      shipmentFormData.append('notify_party', formData.notify_party || '');
+      shipmentFormData.append('payment_terms', formData.payment_terms || '');
+      shipmentFormData.append('marks_and_numbers', formData.marks_and_numbers || '');
+      shipmentFormData.append('tariff_code', formData.tariff_code || '');
       shipmentFormData.append('po_number', formData.po_number);
       shipmentFormData.append('po_date', formData.po_date);
       shipmentFormData.append('currency', formData.currency);
@@ -363,8 +377,8 @@ function NewShipment() {
       <header className="bg-navy text-white shadow-lg" data-testid="new-shipment-header">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center space-x-3">
-            <Package className="w-8 h-8" />
-            <h1 className="text-2xl font-bold">ExportAssist</h1>
+            <img src="/TDA.png" alt="TradesdocAi Logo" className="w-8 h-8 rounded-full object-contain" />
+            <h1 className="text-2xl font-bold">TradesdocAi</h1>
           </div>
         </div>
       </header>
@@ -498,6 +512,9 @@ function NewShipment() {
                         setFormData({
                           buyer_name: '',
                           buyer_address: '',
+                          consignee: '',
+                          notify_party: '',
+                          payment_terms: '',
                           po_number: '',
                           po_date: '',
                           currency: 'USD',
@@ -506,7 +523,10 @@ function NewShipment() {
                           incoterms: 'FOB',
                           total_packages: 1,
                           package_type: 'BOXES',
-                          items: [{ description: '', quantity: 0, unit_price: 0, hs_code: '', total_amount: 0, net_weight: 0, gross_weight: 0 }]
+                          include_inr_column: false,
+                          marks_and_numbers: '',
+                          tariff_code: '',
+                          items: [{ description: '', quantity: 0, unit_of_measure: '', unit_price: 0, hs_code: '', total_amount: 0, net_weight: 0, gross_weight: 0, length_cm: 0, width_cm: 0, height_cm: 0 }]
                         });
                         setStep(3);
                       }}
@@ -600,6 +620,45 @@ function NewShipment() {
                       data-testid="buyer-address-input"
                     />
                   </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                      Consignee
+                    </label>
+                    <input
+                      type="text"
+                      name="consignee"
+                      value={formData.consignee || ''}
+                      onChange={handleFormChange}
+                      placeholder="If different from buyer"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                      Notify Party
+                    </label>
+                    <input
+                      type="text"
+                      name="notify_party"
+                      value={formData.notify_party || ''}
+                      onChange={handleFormChange}
+                      placeholder="e.g. Freight agent name & address"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                      Payment Terms
+                    </label>
+                    <input
+                      type="text"
+                      name="payment_terms"
+                      value={formData.payment_terms || ''}
+                      onChange={handleFormChange}
+                      placeholder="e.g. T/T 30 days, Letter of Credit"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                    />
+                  </div>
                   <div>
                     <label className="block text-gray-700 text-sm font-medium mb-2">
                       Currency *
@@ -653,6 +712,32 @@ function NewShipment() {
                       placeholder="e.g., USLAX - Los Angeles"
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
                       data-testid="port-of-discharge-input"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                      Marks &amp; Numbers
+                    </label>
+                    <input
+                      type="text"
+                      name="marks_and_numbers"
+                      value={formData.marks_and_numbers || ''}
+                      onChange={handleFormChange}
+                      placeholder="Shipping marks as per PO"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                      Tariff Code
+                    </label>
+                    <input
+                      type="text"
+                      name="tariff_code"
+                      value={formData.tariff_code || ''}
+                      onChange={handleFormChange}
+                      placeholder="HS/HTS code if specified by buyer"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
                     />
                   </div>
                   <div>
@@ -734,9 +819,13 @@ function NewShipment() {
                         <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Description</th>
                         <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase bg-yellow-50">HS Code ⚠️</th>
                         <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Qty</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Unit</th>
                         <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Rate ({formData.currency})</th>
                         <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Net Wt (kg)</th>
                         <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Gross Wt (kg)</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">L (cm)</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">W (cm)</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">H (cm)</th>
                         <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Amount ({formData.currency})</th>
                         {formData.currency !== 'INR' && (
                           <th className="px-2 py-3 text-left text-xs font-medium text-green-700 uppercase bg-green-50">Amount (₹ INR)</th>
@@ -803,6 +892,16 @@ function NewShipment() {
                           </td>
                           <td className="px-2 py-3">
                             <input
+                              type="text"
+                              value={item.unit_of_measure || ''}
+                              onChange={(e) => handleItemChange(index, 'unit_of_measure', e.target.value)}
+                              className="w-16 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-navy text-sm"
+                              placeholder="KGS"
+                              data-testid={`item-unit-${index}`}
+                            />
+                          </td>
+                          <td className="px-2 py-3">
+                            <input
                               type="number"
                               value={item.unit_price}
                               onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
@@ -833,6 +932,39 @@ function NewShipment() {
                               min="0"
                               step="0.01"
                               data-testid={`item-gross-weight-${index}`}
+                            />
+                          </td>
+                          <td className="px-2 py-3">
+                            <input
+                              type="number"
+                              value={item.length_cm || 0}
+                              onChange={(e) => handleItemChange(index, 'length_cm', e.target.value)}
+                              className="w-14 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-navy text-sm"
+                              min="0"
+                              step="0.1"
+                              data-testid={`item-length-${index}`}
+                            />
+                          </td>
+                          <td className="px-2 py-3">
+                            <input
+                              type="number"
+                              value={item.width_cm || 0}
+                              onChange={(e) => handleItemChange(index, 'width_cm', e.target.value)}
+                              className="w-14 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-navy text-sm"
+                              min="0"
+                              step="0.1"
+                              data-testid={`item-width-${index}`}
+                            />
+                          </td>
+                          <td className="px-2 py-3">
+                            <input
+                              type="number"
+                              value={item.height_cm || 0}
+                              onChange={(e) => handleItemChange(index, 'height_cm', e.target.value)}
+                              className="w-14 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-navy text-sm"
+                              min="0"
+                              step="0.1"
+                              data-testid={`item-height-${index}`}
                             />
                           </td>
                           <td className={`px-2 py-3 font-medium text-sm ${hasMathMismatch ? 'bg-red-100 text-red-700' : ''}`} data-testid={`item-total-${index}`}>

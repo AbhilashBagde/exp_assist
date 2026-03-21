@@ -1,16 +1,19 @@
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form, status
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form, status, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pymongo import MongoClient
 from datetime import datetime, timedelta
 from typing import Optional, List
+from collections import defaultdict
 import os
 import jwt
 import bcrypt
 import json
 import base64
 import io
+import re
+import time
 import httpx
 from pathlib import Path
 from dotenv import load_dotenv
@@ -33,22 +36,39 @@ load_dotenv()
 
 app = FastAPI()
 
-# CORS Configuration
+# CORS Configuration - restrict in production
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-  # <--- Add this import
+# Simple Rate Limiting (in-memory, per IP)
+rate_limit_store = defaultdict(list)
+RATE_LIMIT_WINDOW = 60  # seconds
+RATE_LIMIT_MAX_REQUESTS = 60  # max requests per window
+
+@app.middleware("http")
+async def rate_limit_middleware(request, call_next):
+    client_ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    # Clean old entries
+    rate_limit_store[client_ip] = [t for t in rate_limit_store[client_ip] if now - t < RATE_LIMIT_WINDOW]
+    if len(rate_limit_store[client_ip]) >= RATE_LIMIT_MAX_REQUESTS:
+        return JSONResponse(status_code=429, content={"detail": "Too many requests. Please try again later."})
+    rate_limit_store[client_ip].append(now)
+    response = await call_next(request)
+    return response
+
 # MongoDB Connection
-MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017/exportassist")
+MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017/tradesdocai")
 
 # Add tlsCAFile=certifi.where() to fix the SSL Handshake error
 client = MongoClient(MONGO_URL, tlsCAFile=certifi.where()) 
-db = client.exportassist
+db = client.tradesdocai
 
 # Collections
 users_collection = db.users
@@ -70,6 +90,22 @@ security = HTTPBearer()
 # Create uploads directory
 UPLOADS_DIR = Path("uploads")
 UPLOADS_DIR.mkdir(exist_ok=True)
+
+# Auto Invoice Numbering
+def get_next_invoice_number(user_id: str) -> str:
+    """Generate next sequential invoice number for a user (INV-001, INV-002, etc.)"""
+    # Find the highest invoice number for this user
+    last_shipment = shipments_collection.find_one(
+        {"user_id": user_id, "invoice_number": {"$exists": True, "$ne": ""}},
+        sort=[("invoice_number", -1)]
+    )
+    if last_shipment and last_shipment.get("invoice_number"):
+        # Extract number from INV-XXX format
+        match = re.search(r'INV-(\d+)', last_shipment["invoice_number"])
+        if match:
+            next_num = int(match.group(1)) + 1
+            return f"INV-{next_num:03d}"
+    return "INV-001"
 
 # Fallback Exchange Rates to INR (used when API fails)
 FALLBACK_RATES_TO_INR = {
@@ -350,17 +386,26 @@ async def create_shipment(
     incoterms: str = Form("FOB"),
     total_packages: int = Form(1),
     package_type: str = Form("BOXES"),
-    include_inr_column: str = Form("false")
+    include_inr_column: str = Form("false"),
+    consignee: str = Form(""),
+    notify_party: str = Form(""),
+    payment_terms: str = Form(""),
+    marks_and_numbers: str = Form(""),
+    tariff_code: str = Form("")
 ):
     items_list = json.loads(items)
-    
+
     # Parse include_inr_column as boolean
     include_inr_bool = include_inr_column.lower() in ('true', '1', 'yes')
-    
+
+    # Auto-generate invoice number
+    invoice_number = get_next_invoice_number(user_id)
+
     shipment_id = str(uuid.uuid4())
     shipment_data = {
         "_id": shipment_id,
         "user_id": user_id,
+        "invoice_number": invoice_number,
         "buyer_name": buyer_name,
         "buyer_address": buyer_address,
         "po_number": po_number,
@@ -372,14 +417,19 @@ async def create_shipment(
         "total_packages": total_packages,
         "package_type": package_type,
         "include_inr_column": include_inr_bool,
+        "consignee": consignee,
+        "notify_party": notify_party,
+        "payment_terms": payment_terms,
+        "marks_and_numbers": marks_and_numbers,
+        "tariff_code": tariff_code,
         "status": "Draft",
         "items": items_list,
         "created_at": datetime.utcnow()
     }
-    
+
     shipments_collection.insert_one(shipment_data)
-    
-    return {"success": True, "shipment_id": shipment_id}
+
+    return {"success": True, "shipment_id": shipment_id, "invoice_number": invoice_number}
 
 @app.put("/api/shipments/{shipment_id}")
 async def update_shipment(
@@ -396,10 +446,17 @@ async def update_shipment(
     port_of_discharge: str = Form(""),
     incoterms: str = Form("FOB"),
     total_packages: int = Form(1),
-    package_type: str = Form("BOXES")
+    package_type: str = Form("BOXES"),
+    consignee: str = Form(""),
+    notify_party: str = Form(""),
+    payment_terms: str = Form(""),
+    marks_and_numbers: str = Form(""),
+    tariff_code: str = Form(""),
+    include_inr_column: str = Form("false")
 ):
     items_list = json.loads(items)
-    
+    include_inr_bool = include_inr_column.lower() in ('true', '1', 'yes')
+
     result = shipments_collection.update_one(
         {"_id": shipment_id, "user_id": user_id},
         {"$set": {
@@ -413,16 +470,97 @@ async def update_shipment(
             "incoterms": incoterms,
             "total_packages": total_packages,
             "package_type": package_type,
+            "consignee": consignee,
+            "notify_party": notify_party,
+            "payment_terms": payment_terms,
+            "marks_and_numbers": marks_and_numbers,
+            "tariff_code": tariff_code,
+            "include_inr_column": include_inr_bool,
             "items": items_list,
             "status": status,
             "updated_at": datetime.utcnow()
         }}
     )
-    
+
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Shipment not found")
-    
+
     return {"success": True}
+
+# Delete Shipment Endpoint
+@app.delete("/api/shipments/{shipment_id}")
+async def delete_shipment(shipment_id: str, user_id: str = Depends(verify_token)):
+    """Delete a shipment and its associated files"""
+    shipment = shipments_collection.find_one({"_id": shipment_id, "user_id": user_id})
+    if not shipment:
+        raise HTTPException(status_code=404, detail="Shipment not found")
+    
+    # Delete associated files (invoice PDF, packing list, tally XML)
+    for prefix in ["invoice_", "packing_list_", "tally_export_"]:
+        for ext in [".pdf", ".xml"]:
+            file_path = UPLOADS_DIR / f"{prefix}{shipment_id}{ext}"
+            if file_path.exists():
+                file_path.unlink()
+    
+    result = shipments_collection.delete_one({"_id": shipment_id, "user_id": user_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Shipment not found")
+    
+    return {"success": True, "message": "Shipment deleted successfully"}
+
+# Duplicate PO Check Endpoint
+@app.get("/api/shipments/check-duplicate-po")
+async def check_duplicate_po(
+    po_number: str = Query(...),
+    user_id: str = Depends(verify_token)
+):
+    """Check if a PO number already exists for the user"""
+    existing = shipments_collection.find_one({"user_id": user_id, "po_number": po_number})
+    return {
+        "is_duplicate": existing is not None,
+        "existing_shipment_id": str(existing["_id"]) if existing else None,
+        "buyer_name": existing.get("buyer_name", "") if existing else None
+    }
+
+# Revert Shipment to Draft (allow re-editing after finalization)
+@app.post("/api/shipments/{shipment_id}/revert-to-draft")
+async def revert_to_draft(shipment_id: str, user_id: str = Depends(verify_token)):
+    """Revert a finalized shipment back to Draft for re-editing"""
+    shipment = shipments_collection.find_one({"_id": shipment_id, "user_id": user_id})
+    if not shipment:
+        raise HTTPException(status_code=404, detail="Shipment not found")
+    
+    shipments_collection.update_one(
+        {"_id": shipment_id, "user_id": user_id},
+        {"$set": {"status": "Draft", "updated_at": datetime.utcnow()}}
+    )
+    
+    return {"success": True, "message": "Shipment reverted to Draft"}
+
+# Search/Filter Shipments
+@app.get("/api/shipments/search")
+async def search_shipments(
+    q: str = Query("", description="Search term"),
+    status_filter: str = Query("", description="Filter by status: Draft, Final"),
+    user_id: str = Depends(verify_token)
+):
+    """Search shipments by buyer name, PO number, or filter by status"""
+    query = {"user_id": user_id}
+    
+    if q:
+        query["$or"] = [
+            {"buyer_name": {"$regex": q, "$options": "i"}},
+            {"po_number": {"$regex": q, "$options": "i"}}
+        ]
+    
+    if status_filter:
+        query["status"] = status_filter
+    
+    shipments = list(shipments_collection.find(query).sort("created_at", -1))
+    for shipment in shipments:
+        shipment["_id"] = str(shipment["_id"])
+        shipment["created_at"] = shipment["created_at"].isoformat()
+    return shipments
 
 # AI Vision Processing Endpoint
 @app.post("/api/shipments/extract")
@@ -437,65 +575,72 @@ async def extract_po_data(
         # Read file content
         file_content = await file.read()
         
-        # Convert to image if PDF
+        # Convert to images if PDF (support multi-page)
         if file.filename.lower().endswith('.pdf'):
             images = convert_from_bytes(file_content)
-            # Use first page
-            img_byte_arr = io.BytesIO()
-            images[0].save(img_byte_arr, format='PNG')
-            img_byte_arr.seek(0)
-            image_data = img_byte_arr.getvalue()
+            # Process ALL pages for multi-page PO support
+            page_images = []
+            for page in images:
+                img_byte_arr = io.BytesIO()
+                page.save(img_byte_arr, format='PNG')
+                img_byte_arr.seek(0)
+                page_images.append(PILImage.open(io.BytesIO(img_byte_arr.getvalue())))
         else:
-            image_data = file_content
-        
-        # Prepare image for Gemini
-        image = PILImage.open(io.BytesIO(image_data))
+            page_images = [PILImage.open(io.BytesIO(file_content))]
         
         # Use Gemini 2.5 Flash (stable multimodal model)
         model = genai.GenerativeModel('models/gemini-2.5-flash')
         
-        prompt = """Analyze this Purchase Order document image. Extract the following information and return ONLY a valid JSON object:
+        prompt = """Analyze this Indian export Purchase Order document image. Extract the following information and return ONLY a valid JSON object with no additional text or markdown.
 
 {
-  "buyer_name": "Name of the buyer/customer",
+  "buyer_name": "Name of the buyer/importer",
   "buyer_address": "Full address of the buyer",
   "po_number": "Purchase Order number",
-  "po_date": "Date in YYYY-MM-DD format",
-  "currency_code": "Detected currency code",
+  "po_date": "Date in YYYY-MM-DD format, or null if not found",
+  "currency_code": "Detected currency code (e.g. USD, EUR, GBP, AED, SGD, INR)",
+  "consignee": "Party to whom goods are consigned — may differ from buyer; null if not stated",
+  "notify_party": "Party to be notified on arrival of shipment; null if not stated",
+  "payment_terms": "Full payment terms as written (e.g. 'T/T 30 days after BL', 'Letter of Credit at sight', 'DA 60 days'); null if not stated",
+  "port_of_loading": "Port of loading if specified; null if not stated",
+  "port_of_discharge": "Port of discharge / destination port if specified; null if not stated",
+  "marks_and_numbers": "Shipping marks or marks & numbers if stated; null if not stated",
+  "tariff_code": "HS/HTS code if the buyer has specified one in the PO; null if not present",
   "items": [
     {
-      "description": "Item description",
-      "quantity": number,
-      "unit_price": number,
-      "hs_code": "Predicted Indian ITC-HS Code (6 or 8 digits)"
+      "description": "Full item description as written",
+      "quantity": <number>,
+      "unit_of_measure": "Unit of measure exactly as written, e.g. KGS, MT, NOS, PCS, LTR, CTN, SET",
+      "unit_price": <number>,
+      "hs_code": "8-digit Indian ITC-HS code as a string with NO dots or spaces, e.g. '10063000'"
     }
   ]
 }
 
 CRITICAL - CURRENCY DETECTION:
-STRICTLY look for currency indicators in the document. Scan the 'Total', 'Amount', 'Rate', or 'Price' columns/fields for:
+Scan the Total, Amount, Rate, and Price columns/fields for:
 - Currency symbols: ₹, $, €, £, ¥, د.إ
 - Currency codes: INR, USD, EUR, GBP, AED, SGD, JPY
-- Text indicators: Rs, Rupees, Dollars
+- Text: Rs, Rupees, Dollars
 
-Currency Detection Rules:
-- If you see '₹', 'Rs', 'Rupees', or 'INR' → set currency_code to "INR"
-- If you see '$' or 'USD' → set currency_code to "USD"
-- If you see '£' or 'GBP' → set currency_code to "GBP"
-- If you see '€' or 'EUR' → set currency_code to "EUR"
-- If you see 'د.إ' or 'AED' → set currency_code to "AED"
-- If you see 'S$' or 'SGD' → set currency_code to "SGD"
-- If no clear currency found → default to "USD"
+Rules:
+- ₹ / Rs / Rupees / INR → "INR"
+- $ / USD → "USD"
+- £ / GBP → "GBP"
+- € / EUR → "EUR"
+- د.إ / AED → "AED"
+- S$ / SGD → "SGD"
+- No currency found → "USD"
 
-For the HS Code prediction:
-- Analyze the item description carefully
-- Predict the correct Indian ITC-HS Code based on the product type
-- Examples: Basmati Rice -> 1006.30, Cotton Fabric -> 5208.00, Tea -> 0902.00
-- Use your knowledge of Indian export classification
+CRITICAL - HS CODE FORMAT:
+- Output EXACTLY 8 digits with NO dots, dashes, or spaces
+- Examples: Basmati Rice → "10063000", Cotton Woven Fabric → "52081200", Black Tea → "09024090"
+- If you predict only 6 digits, append "00" to make it 8 digits
+- Use your knowledge of the Indian ITC-HS classification schedule
 
-Return ONLY the JSON object, no additional text."""
+Return ONLY the JSON object, no additional text or markdown."""
         
-        response = model.generate_content([prompt, image])
+        response = model.generate_content([prompt] + page_images)
         
         # Parse the response
         result_text = response.text.strip()
@@ -719,6 +864,7 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
                 self._nextPageTemplateIndex = 1  # Switch to 'Later' template
     
     # Create document with custom template
+    invoice_no = shipment.get('invoice_number', shipment['po_number'])
     doc = InvoiceDocTemplate(
         str(pdf_path), 
         pagesize=A4,
@@ -727,7 +873,7 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
         leftMargin=0.5*inch, 
         rightMargin=0.5*inch,
         company_name=profile['company_name'],
-        invoice_no=shipment['po_number'],
+        invoice_no=invoice_no,
         invoice_date=shipment['po_date']
     )
     
@@ -743,7 +889,7 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
                 'Title', parent=styles['Heading1'], fontSize=16, 
                 textColor=colors.HexColor('#0f172a'), alignment=TA_CENTER
             )),
-            Paragraph(f"<b>Invoice No:</b> {shipment['po_number']}<br/><b>Date:</b> {shipment['po_date']}", 
+            Paragraph(f"<b>Invoice No:</b> {invoice_no}<br/><b>Date:</b> {shipment['po_date']}", 
                      ParagraphStyle('InvoiceBox', parent=styles['Normal'], fontSize=10,
                                   borderWidth=1, borderColor=colors.black, borderPadding=8))
         ]
@@ -766,10 +912,14 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
     if profile.get('address_line2'):
         exporter_text += f"<br/>{profile['address_line2']}"
     exporter_text += f"<br/><b>IEC:</b> {profile['iec_code']}<br/><b>GSTIN:</b> {profile['gst_number']}"
+    if profile.get('ad_code'):
+        exporter_text += f"<br/><b>AD Code:</b> {profile['ad_code']}"
     
     consignee_text = f"<b>CONSIGNEE / BUYER</b><br/>{shipment['buyer_name']}"
     if shipment.get('buyer_address'):
         consignee_text += f"<br/>{shipment['buyer_address']}"
+    if shipment.get('notify_party'):
+        consignee_text += f"<br/><b>Notify Party:</b> {shipment['notify_party']}"
     consignee_text += f"<br/><b>PO Number:</b> {shipment['po_number']}<br/><b>PO Date:</b> {shipment['po_date']}"
     
     parties_data = [
@@ -794,16 +944,17 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
     elements.append(Spacer(1, 0.15*inch))
     
     # ========== ZONE 3: LOGISTICS STRIP ==========
-    logistics_headers = ['Country of Origin', 'Port of Loading', 'Port of Discharge', 'Incoterms']
+    logistics_headers = ['Country of Origin', 'Port of Loading', 'Port of Discharge', 'Incoterms', 'Payment Terms']
     logistics_values = [
         'India',
         shipment.get('port_of_loading', 'N/A'),
         shipment.get('port_of_discharge', 'N/A'),
-        shipment.get('incoterms', 'FOB')
+        shipment.get('incoterms', 'FOB'),
+        shipment.get('payment_terms', 'As per PO')
     ]
-    
+
     logistics_data = [logistics_headers, logistics_values]
-    logistics_table = Table(logistics_data, colWidths=[1.875*inch]*4)
+    logistics_table = Table(logistics_data, colWidths=[1.5*inch]*5)
     logistics_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#d3d3d3')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
@@ -815,8 +966,28 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
     ]))
     elements.append(logistics_table)
+
+    # Marks & Numbers row
+    marks_data = [[
+        Paragraph('<b>Marks &amp; Numbers:</b>', ParagraphStyle('MarksLabel', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold')),
+        Paragraph(shipment.get('marks_and_numbers', 'As per PO'), ParagraphStyle('MarksValue', parent=styles['Normal'], fontSize=9))
+    ]]
+    marks_table = Table(marks_data, colWidths=[1.5*inch, 6.0*inch])
+    marks_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+        ('ALIGN', (1, 0), (1, 0), 'LEFT'),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+        ('BOX', (0, 0), (-1, -1), 0.5, colors.black),
+        ('LINEAFTER', (0, 0), (0, -1), 0.5, colors.black),
+        ('BACKGROUND', (0, 0), (0, 0), colors.HexColor('#d3d3d3')),
+    ]))
+    elements.append(marks_table)
     elements.append(Spacer(1, 0.15*inch))
-    
+
     # ========== ZONE 4: THE GOODS (Main Table) - SPLIT FOR MULTI-PAGE ==========
     # Table header style
     table_header_style = ParagraphStyle('TableHeader', parent=styles['Normal'], fontSize=9, textColor=colors.whitesmoke)
@@ -832,44 +1003,48 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
             Paragraph('<b>Description</b>', table_header_style),
             Paragraph('<b>HS Code</b>', table_header_style),
             Paragraph('<b>Qty</b>', table_header_style),
+            Paragraph('<b>Unit</b>', table_header_style),
             Paragraph(f'<b>Rate ({currency})</b>', table_header_style),
             Paragraph(f'<b>Amount ({currency})</b>', table_header_style),
             Paragraph('<b>Amount (INR)</b>', table_header_style)
         ]]
-        
+
         total_inr = 0
         for item in shipment['items']:
             inr_amount = item['total_amount'] * inr_rate
             total_inr += inr_amount
             items_data.append([
                 item['description'],
-                item['hs_code'],
+                item.get('hs_code', ''),
                 str(item['quantity']),
+                item.get('unit_of_measure', ''),
                 f"{item['unit_price']:.2f}",
                 f"{item['total_amount']:,.2f}",
                 f"{inr_amount:,.2f}"
             ])
-        
-        items_table = Table(items_data, colWidths=[2.4*inch, 0.9*inch, 0.6*inch, 1*inch, 1.1*inch, 1.5*inch], repeatRows=1)
+
+        items_table = Table(items_data, colWidths=[2.1*inch, 0.8*inch, 0.5*inch, 0.5*inch, 0.9*inch, 1.0*inch, 1.7*inch], repeatRows=1)
     else:
         items_data = [[
             Paragraph('<b>Description</b>', table_header_style),
             Paragraph('<b>HS Code</b>', table_header_style),
             Paragraph('<b>Qty</b>', table_header_style),
+            Paragraph('<b>Unit</b>', table_header_style),
             Paragraph(f'<b>Rate ({currency})</b>', table_header_style),
             Paragraph(f'<b>Amount ({currency})</b>', table_header_style)
         ]]
-        
+
         for item in shipment['items']:
             items_data.append([
                 item['description'],
-                item['hs_code'],
+                item.get('hs_code', ''),
                 str(item['quantity']),
+                item.get('unit_of_measure', ''),
                 f"{item['unit_price']:.2f}",
                 f"{item['total_amount']:,.2f}"
             ])
-        
-        items_table = Table(items_data, colWidths=[3*inch, 1*inch, 0.7*inch, 1.15*inch, 1.65*inch], repeatRows=1)
+
+        items_table = Table(items_data, colWidths=[2.6*inch, 0.9*inch, 0.55*inch, 0.55*inch, 1.1*inch, 1.8*inch], repeatRows=1)
     items_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0f172a')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -991,7 +1166,8 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
         alignment=TA_CENTER,
         textColor=colors.grey
     )
-    elements.append(Paragraph("Supply Meant for Export Under Bond/LUT", compliance_style))
+    elements.append(Paragraph("Supply Meant for Export Under Bond/LUT Without Payment of Integrated Tax", compliance_style))
+    elements.append(Paragraph("We hereby certify that the goods described herein are of Indian Origin.", compliance_style))
     
     # Build PDF
     doc.build(elements)
@@ -1012,6 +1188,128 @@ async def serve_upload(filename: str):
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(str(file_path))
 
+# Shipment Validation Endpoint
+@app.get("/api/shipments/{shipment_id}/validate")
+async def validate_shipment(shipment_id: str, user_id: str = Depends(verify_token)):
+    shipment = shipments_collection.find_one({"_id": shipment_id, "user_id": user_id})
+    if not shipment:
+        raise HTTPException(status_code=404, detail="Shipment not found")
+
+    errors = []
+    warnings = []
+    total_checks = 0
+    passed_checks = 0
+
+    items = shipment.get('items', [])
+
+    # ── ERRORS ────────────────────────────────────────────────────────────────
+
+    # invoice_number
+    total_checks += 1
+    if not shipment.get('invoice_number', ''):
+        errors.append("Invoice number is missing — cannot be submitted without one.")
+    else:
+        passed_checks += 1
+
+    # buyer_name
+    total_checks += 1
+    if not shipment.get('buyer_name', ''):
+        errors.append("Buyer name is missing.")
+    else:
+        passed_checks += 1
+
+    # at least one item
+    total_checks += 1
+    if not items:
+        errors.append("No items found — at least one item is required.")
+    else:
+        passed_checks += 1
+
+    # per-item hs_code: exactly 8 digits, no dots, no spaces
+    for idx, item in enumerate(items):
+        total_checks += 1
+        hs = str(item.get('hs_code', '') or '')
+        desc_preview = (item.get('description', '') or '')[:30]
+        if not re.match(r'^\d{8}$', hs):
+            errors.append(
+                f"Item {idx + 1} ("{desc_preview}"): HS code must be exactly 8 digits with no dots or spaces (current value: "{hs}")."
+            )
+        else:
+            passed_checks += 1
+
+    # ── WARNINGS ──────────────────────────────────────────────────────────────
+
+    # port_of_loading
+    total_checks += 1
+    if not shipment.get('port_of_loading', ''):
+        warnings.append("Port of loading is not set.")
+    else:
+        passed_checks += 1
+
+    # port_of_discharge
+    total_checks += 1
+    if not shipment.get('port_of_discharge', ''):
+        warnings.append("Port of discharge is not set.")
+    else:
+        passed_checks += 1
+
+    # payment_terms
+    total_checks += 1
+    if not shipment.get('payment_terms', ''):
+        warnings.append("Payment terms are not set.")
+    else:
+        passed_checks += 1
+
+    # buyer_address
+    total_checks += 1
+    if not shipment.get('buyer_address', ''):
+        warnings.append("Buyer address is empty.")
+    else:
+        passed_checks += 1
+
+    # total gross weight across all items
+    total_gross = sum(float(item.get('gross_weight', 0) or 0) for item in items)
+    total_checks += 1
+    if total_gross == 0:
+        warnings.append("Total gross weight is 0 — please enter weights for packing list compliance.")
+    else:
+        passed_checks += 1
+
+    # per-item checks
+    for idx, item in enumerate(items):
+        desc_preview = (item.get('description', '') or '')[:30]
+
+        # unit_of_measure
+        total_checks += 1
+        if not (item.get('unit_of_measure', '') or ''):
+            warnings.append(f"Item {idx + 1} ("{desc_preview}"): unit of measure is not set.")
+        else:
+            passed_checks += 1
+
+        # gross_weight
+        total_checks += 1
+        if float(item.get('gross_weight', 0) or 0) == 0:
+            warnings.append(f"Item {idx + 1} ("{desc_preview}"): gross weight is 0.")
+        else:
+            passed_checks += 1
+
+        # quantity
+        total_checks += 1
+        if float(item.get('quantity', 0) or 0) == 0:
+            warnings.append(f"Item {idx + 1} ("{desc_preview}"): quantity is 0.")
+        else:
+            passed_checks += 1
+
+    score = round((passed_checks / total_checks) * 100) if total_checks > 0 else 100
+
+    return {
+        "passed": len(errors) == 0,
+        "errors": errors,
+        "warnings": warnings,
+        "score": score
+    }
+
+
 # VERSION 2.0 FEATURES
 
 # FEATURE 1: Generate Packing List PDF
@@ -1030,127 +1328,449 @@ async def generate_packing_list_pdf(shipment_id: str, user_id: str = Depends(ver
     # Create PDF
     pdf_filename = f"packing_list_{shipment_id}.pdf"
     pdf_path = UPLOADS_DIR / pdf_filename
-    
-    doc = SimpleDocTemplate(str(pdf_path), pagesize=A4)
-    elements = []
-    
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=18,
-        textColor=colors.HexColor('#0f172a'),
-        spaceAfter=30,
-        alignment=TA_CENTER
+
+    doc = SimpleDocTemplate(
+        str(pdf_path), pagesize=A4,
+        topMargin=0.6*inch, bottomMargin=0.6*inch,
+        leftMargin=0.75*inch, rightMargin=0.75*inch
     )
-    
-    # Title
+    elements = []
+
+    styles = getSampleStyleSheet()
+    invoice_number = shipment.get('invoice_number', shipment.get('po_number', ''))
+
+    # ---- shared styles ----
+    title_style = ParagraphStyle(
+        'PLTitle', parent=styles['Heading1'], fontSize=16,
+        textColor=colors.HexColor('#0f172a'), spaceAfter=6, alignment=TA_CENTER
+    )
+    label_style = ParagraphStyle(
+        'PLLabel', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold'
+    )
+    value_style = ParagraphStyle(
+        'PLValue', parent=styles['Normal'], fontSize=9
+    )
+    th_style = ParagraphStyle(
+        'PLTH', parent=styles['Normal'], fontSize=8,
+        textColor=colors.whitesmoke, fontName='Helvetica-Bold', alignment=TA_CENTER
+    )
+    td_style = ParagraphStyle(
+        'PLTD', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER
+    )
+    td_left_style = ParagraphStyle(
+        'PLTDLeft', parent=styles['Normal'], fontSize=8, alignment=TA_LEFT
+    )
+
+    # ========== HEADER ==========
     elements.append(Paragraph("PACKING LIST", title_style))
-    elements.append(Spacer(1, 0.3*inch))
-    
-    # Company Details
-    company_data = [
-        [Paragraph(f"<b>{profile['company_name']}</b>", styles['Normal'])],
-        [Paragraph(profile['address_line1'], styles['Normal'])],
-    ]
+    elements.append(Spacer(1, 0.1*inch))
+
+    # Two-column header: exporter left, document details right
+    exporter_lines = f"<b>{profile['company_name']}</b><br/>{profile['address_line1']}"
     if profile.get('address_line2'):
-        company_data.append([Paragraph(profile['address_line2'], styles['Normal'])])
-    company_data.extend([
-        [Paragraph(f"IEC: {profile['iec_code']} | GST: {profile['gst_number']}", styles['Normal'])],
-    ])
-    
-    company_table = Table(company_data, colWidths=[6*inch])
-    company_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        exporter_lines += f"<br/>{profile['address_line2']}"
+    exporter_lines += f"<br/><b>IEC:</b> {profile['iec_code']} | <b>GSTIN:</b> {profile['gst_number']}"
+
+    doc_details = (
+        f"<b>Invoice No:</b> {invoice_number}<br/>"
+        f"<b>PO Number:</b> {shipment['po_number']}<br/>"
+        f"<b>PO Date:</b> {shipment['po_date']}<br/>"
+        f"<b>Port of Loading:</b> {shipment.get('port_of_loading', 'N/A')}<br/>"
+        f"<b>Port of Discharge:</b> {shipment.get('port_of_discharge', 'N/A')}"
+    )
+
+    header_data = [[
+        Paragraph(exporter_lines, value_style),
+        Paragraph(doc_details, value_style)
+    ]]
+    header_table = Table(header_data, colWidths=[3.5*inch, 3.5*inch])
+    header_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+        ('ALIGN', (1, 0), (1, 0), 'LEFT'),
+        ('BOX', (0, 0), (-1, -1), 1, colors.black),
+        ('LINEAFTER', (0, 0), (0, -1), 1, colors.black),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
     ]))
-    elements.append(company_table)
-    elements.append(Spacer(1, 0.3*inch))
-    
-    # Buyer Details
-    buyer_data = [
-        [Paragraph("<b>BUYER DETAILS:</b>", styles['Normal'])],
-        [Paragraph(shipment['buyer_name'], styles['Normal'])],
-    ]
+    elements.append(header_table)
+    elements.append(Spacer(1, 0.15*inch))
+
+    # ========== BUYER / CONSIGNEE BLOCK ==========
+    buyer_text = f"<b>CONSIGNEE / BUYER</b><br/>{shipment['buyer_name']}"
     if shipment.get('buyer_address'):
-        buyer_data.append([Paragraph(shipment['buyer_address'], styles['Normal'])])
-    
-    buyer_table = Table(buyer_data, colWidths=[6*inch])
+        buyer_text += f"<br/>{shipment['buyer_address']}"
+    if shipment.get('notify_party'):
+        buyer_text += f"<br/><b>Notify Party:</b> {shipment['notify_party']}"
+
+    buyer_data = [[Paragraph(buyer_text, value_style)]]
+    buyer_table = Table(buyer_data, colWidths=[7.0*inch])
     buyer_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('BOX', (0, 0), (-1, -1), 1, colors.black),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
     ]))
     elements.append(buyer_table)
-    elements.append(Spacer(1, 0.2*inch))
-    
-    # Shipment Details
-    shipment_info = [
-        [Paragraph(f"<b>PO Number:</b> {shipment['po_number']}", styles['Normal']),
-         Paragraph(f"<b>PO Date:</b> {shipment['po_date']}", styles['Normal'])]]
-    shipment_table = Table(shipment_info, colWidths=[3*inch, 3*inch])
-    elements.append(shipment_table)
-    elements.append(Spacer(1, 0.3*inch))
-    
-    # Items Table (No prices, includes weights)
-    items_data = [['Description', 'Qty', 'Net Wt (kg)', 'Gross Wt (kg)']]
-    total_net_weight = 0
-    total_gross_weight = 0
-    
-    for item in shipment['items']:
-        net_wt = item.get('net_weight', 0)
-        gross_wt = item.get('gross_weight', 0)
-        items_data.append([
-            item['description'],
-            str(item['quantity']),
-            f"{net_wt:.2f}",
-            f"{gross_wt:.2f}"
-        ])
+    elements.append(Spacer(1, 0.15*inch))
+
+    # ========== MARKS & NUMBERS BLOCK ==========
+    marks_data = [[
+        Paragraph('<b>Marks &amp; Numbers:</b>', label_style),
+        Paragraph(shipment.get('marks_and_numbers', 'As per PO'), value_style)
+    ]]
+    marks_table = Table(marks_data, colWidths=[1.5*inch, 5.5*inch])
+    marks_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('BOX', (0, 0), (-1, -1), 0.5, colors.black),
+        ('LINEAFTER', (0, 0), (0, -1), 0.5, colors.black),
+        ('BACKGROUND', (0, 0), (0, 0), colors.HexColor('#d3d3d3')),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(marks_table)
+    elements.append(Spacer(1, 0.15*inch))
+
+    # ========== ITEMS TABLE ==========
+    # Columns: Sr No | Description | HS Code | Unit | Qty | Net Wt (kg) | Gross Wt (kg) | Dimensions (L×W×H cm) | CBM
+    col_widths = [0.35*inch, 1.9*inch, 0.75*inch, 0.55*inch, 0.45*inch, 0.65*inch, 0.7*inch, 0.95*inch, 0.65*inch]
+
+    items_data = [[
+        Paragraph('<b>Sr<br/>No</b>', th_style),
+        Paragraph('<b>Description</b>', th_style),
+        Paragraph('<b>HS Code</b>', th_style),
+        Paragraph('<b>Unit</b>', th_style),
+        Paragraph('<b>Qty</b>', th_style),
+        Paragraph('<b>Net Wt<br/>(kg)</b>', th_style),
+        Paragraph('<b>Gross Wt<br/>(kg)</b>', th_style),
+        Paragraph('<b>Dimensions<br/>(L×W×H cm)</b>', th_style),
+        Paragraph('<b>CBM</b>', th_style),
+    ]]
+
+    total_qty = 0
+    total_net_weight = 0.0
+    total_gross_weight = 0.0
+    total_cbm = 0.0
+
+    for sr, item in enumerate(shipment['items'], start=1):
+        net_wt = float(item.get('net_weight', 0) or 0)
+        gross_wt = float(item.get('gross_weight', 0) or 0)
+        qty = item.get('quantity', 0)
+        l = float(item.get('length_cm', 0) or 0)
+        w = float(item.get('width_cm', 0) or 0)
+        h = float(item.get('height_cm', 0) or 0)
+        cbm = (l * w * h) / 1_000_000
+
+        total_qty += qty
         total_net_weight += net_wt
         total_gross_weight += gross_wt
-    
-    items_data.append(['TOTAL:', '', f"{total_net_weight:.2f}", f"{total_gross_weight:.2f}"])
-    
-    items_table = Table(items_data, colWidths=[3*inch, 1*inch, 1.2*inch, 1.2*inch])
+        total_cbm += cbm
+
+        dim_str = f"{l:.0f}×{w:.0f}×{h:.0f}" if (l or w or h) else "—"
+
+        items_data.append([
+            Paragraph(str(sr), td_style),
+            Paragraph(item.get('description', ''), td_left_style),
+            Paragraph(item.get('hs_code', ''), td_style),
+            Paragraph(item.get('unit_of_measure', ''), td_style),
+            Paragraph(str(qty), td_style),
+            Paragraph(f"{net_wt:.2f}", td_style),
+            Paragraph(f"{gross_wt:.2f}", td_style),
+            Paragraph(dim_str, td_style),
+            Paragraph(f"{cbm:.4f}", td_style),
+        ])
+
+    # Totals row
+    items_data.append([
+        Paragraph('', td_style),
+        Paragraph('<b>TOTAL</b>', ParagraphStyle('TotalLabel', parent=styles['Normal'], fontSize=8, fontName='Helvetica-Bold', alignment=TA_LEFT)),
+        Paragraph('', td_style),
+        Paragraph('', td_style),
+        Paragraph(f'<b>{total_qty}</b>', ParagraphStyle('TotalVal', parent=styles['Normal'], fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph(f'<b>{total_net_weight:.2f}</b>', ParagraphStyle('TotalVal2', parent=styles['Normal'], fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph(f'<b>{total_gross_weight:.2f}</b>', ParagraphStyle('TotalVal3', parent=styles['Normal'], fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('', td_style),
+        Paragraph(f'<b>{total_cbm:.4f}</b>', ParagraphStyle('TotalVal4', parent=styles['Normal'], fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+    ])
+
+    items_table = Table(items_data, colWidths=col_widths, repeatRows=1)
     items_table.setStyle(TableStyle([
+        # Header row
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0f172a')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -2), colors.beige),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        # Data rows — alternate background
+        ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#f8f9fa')]),
+        # Totals row
         ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#e2e8f0')),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        # Grid and alignment
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('ALIGN', (1, 1), (1, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 3),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 3),
     ]))
     elements.append(items_table)
-    elements.append(Spacer(1, 0.4*inch))
-    
+    elements.append(Spacer(1, 0.35*inch))
+
+    # ========== FOOTER: SIGNATURE + CROSS-REFERENCE + DISCLAIMER ==========
     # Signature
     if profile.get('signature_image_url'):
         sig_path = UPLOADS_DIR / profile['signature_image_url'].split('/')[-1]
         if sig_path.exists():
             elements.append(Image(str(sig_path), width=2*inch, height=1*inch))
             elements.append(Spacer(1, 0.1*inch))
-    
-    elements.append(Paragraph("Authorized Signatory", styles['Normal']))
-    elements.append(Spacer(1, 0.3*inch))
-    
-    # Legal Disclaimer
-    disclaimer_style = ParagraphStyle(
-        'Disclaimer',
-        parent=styles['Normal'],
-        fontSize=8,
-        alignment=TA_CENTER,
-        textColor=colors.HexColor('#808080')
+
+    elements.append(Paragraph(f"<b>For {profile['company_name']}</b>", styles['Normal']))
+    elements.append(Paragraph("Authorized Signatory", value_style))
+    elements.append(Spacer(1, 0.2*inch))
+
+    # Cross-reference line
+    xref_style = ParagraphStyle(
+        'XRef', parent=styles['Normal'], fontSize=9,
+        alignment=TA_CENTER, textColor=colors.HexColor('#0f172a')
     )
-    disclaimer_text = "Disclaimer: This document is generated using AI assistance. The Exporter is solely responsible for verifying all data, including HS Codes and values, before submission to Customs. ExportAssist assumes no liability for errors or non-compliance."
-    elements.append(Paragraph(disclaimer_text, disclaimer_style))
-    
+    elements.append(Paragraph(
+        f"This packing list corresponds to Commercial Invoice No: <b>{invoice_number}</b> dated <b>{shipment['po_date']}</b>.",
+        xref_style
+    ))
+    elements.append(Spacer(1, 0.1*inch))
+
+    # Legal disclaimer
+    disclaimer_style = ParagraphStyle(
+        'PLDisclaimer', parent=styles['Normal'], fontSize=7,
+        alignment=TA_CENTER, textColor=colors.HexColor('#808080')
+    )
+    elements.append(Paragraph(
+        "Disclaimer: This document is generated using AI assistance. The Exporter is solely responsible for verifying all data, "
+        "including HS Codes and values, before submission to Customs. TradesdocAi assumes no liability for errors or non-compliance.",
+        disclaimer_style
+    ))
+
     # Build PDF
     doc.build(elements)
-    
+
     return FileResponse(str(pdf_path), media_type='application/pdf', filename=pdf_filename)
+
+# FEATURE 2B: Generate Certificate of Origin PDF
+@app.post("/api/shipments/{shipment_id}/generate-coo")
+async def generate_coo_pdf(shipment_id: str, user_id: str = Depends(verify_token)):
+    shipment = shipments_collection.find_one({"_id": shipment_id, "user_id": user_id})
+    if not shipment:
+        raise HTTPException(status_code=404, detail="Shipment not found")
+
+    profile = profiles_collection.find_one({"user_id": user_id})
+    if not profile:
+        raise HTTPException(status_code=404, detail="Company profile not found")
+
+    pdf_filename = f"coo_{shipment_id}.pdf"
+    pdf_path = UPLOADS_DIR / pdf_filename
+
+    doc = SimpleDocTemplate(
+        str(pdf_path), pagesize=A4,
+        topMargin=0.6*inch, bottomMargin=0.6*inch,
+        leftMargin=0.75*inch, rightMargin=0.75*inch
+    )
+    elements = []
+    styles = getSampleStyleSheet()
+
+    invoice_number = shipment.get('invoice_number', shipment.get('po_number', ''))
+
+    # ---- shared styles ----
+    center_bold = ParagraphStyle('COOCenterBold', parent=styles['Normal'],
+                                 fontSize=18, fontName='Helvetica-Bold', alignment=TA_CENTER)
+    center_normal = ParagraphStyle('COOCenter', parent=styles['Normal'],
+                                   fontSize=11, alignment=TA_CENTER)
+    label_s = ParagraphStyle('COOLabel', parent=styles['Normal'],
+                              fontSize=9, fontName='Helvetica-Bold')
+    value_s = ParagraphStyle('COOValue', parent=styles['Normal'], fontSize=9)
+    th_s = ParagraphStyle('COOTH', parent=styles['Normal'], fontSize=8,
+                          fontName='Helvetica-Bold', textColor=colors.whitesmoke, alignment=TA_CENTER)
+    td_c = ParagraphStyle('COOTDC', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER)
+    td_l = ParagraphStyle('COOTDL', parent=styles['Normal'], fontSize=8, alignment=TA_LEFT)
+
+    BOX_STYLE = TableStyle([
+        ('BOX', (0, 0), (-1, -1), 1, colors.black),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ])
+
+    # ========== HEADER ==========
+    elements.append(Paragraph("CERTIFICATE OF ORIGIN", center_bold))
+    elements.append(Spacer(1, 0.08*inch))
+    elements.append(Paragraph("Country of Origin: <b>INDIA</b>", center_normal))
+    elements.append(Spacer(1, 0.2*inch))
+
+    # ========== BOX 1 & 2: Exporter (left) | Consignee (right) ==========
+    exporter_txt = (
+        f"<b>BOX 1 — EXPORTER</b><br/>"
+        f"{profile['company_name']}<br/>"
+        f"{profile['address_line1']}"
+    )
+    if profile.get('address_line2'):
+        exporter_txt += f"<br/>{profile['address_line2']}"
+    exporter_txt += f"<br/><b>IEC:</b> {profile['iec_code']}"
+
+    # Consignee: prefer consignee field if set and differs from buyer_name
+    consignee_name = shipment.get('consignee', '') or shipment.get('buyer_name', '')
+    consignee_addr = shipment.get('buyer_address', '')
+    consignee_txt = (
+        f"<b>BOX 2 — CONSIGNEE</b><br/>"
+        f"{consignee_name}"
+    )
+    if consignee_addr:
+        consignee_txt += f"<br/>{consignee_addr}"
+
+    parties_data = [[Paragraph(exporter_txt, value_s), Paragraph(consignee_txt, value_s)]]
+    parties_table = Table(parties_data, colWidths=[3.5*inch, 3.5*inch])
+    parties_table.setStyle(TableStyle([
+        ('BOX', (0, 0), (-1, -1), 1, colors.black),
+        ('LINEAFTER', (0, 0), (0, -1), 1, colors.black),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]))
+    elements.append(parties_table)
+    elements.append(Spacer(1, 0.12*inch))
+
+    # ========== BOX 3: Transport ==========
+    transport_headers = ['Port of Loading', 'Port of Discharge', 'Incoterms']
+    transport_values = [
+        shipment.get('port_of_loading', 'N/A'),
+        shipment.get('port_of_discharge', 'N/A'),
+        shipment.get('incoterms', 'FOB'),
+    ]
+    transport_data = [
+        [Paragraph(f"<b>{h}</b>", ParagraphStyle('TH3', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold', alignment=TA_CENTER)) for h in transport_headers],
+        [Paragraph(v, ParagraphStyle('TV3', parent=styles['Normal'], fontSize=9, alignment=TA_CENTER)) for v in transport_values],
+    ]
+    transport_table = Table(transport_data, colWidths=[7.0*inch / 3] * 3)
+    transport_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#d3d3d3')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+    ]))
+    elements.append(transport_table)
+    elements.append(Spacer(1, 0.12*inch))
+
+    # ========== BOX 4: Goods Table ==========
+    goods_headers = [
+        Paragraph('<b>Sr No</b>', th_s),
+        Paragraph('<b>HS Code</b>', th_s),
+        Paragraph('<b>Description</b>', th_s),
+        Paragraph('<b>Qty &amp; Unit</b>', th_s),
+        Paragraph('<b>Gross Wt (kg)</b>', th_s),
+        Paragraph('<b>Invoice No &amp; Date</b>', th_s),
+    ]
+    goods_col_widths = [0.45*inch, 0.85*inch, 2.3*inch, 0.9*inch, 0.9*inch, 1.6*inch]
+    goods_data = [goods_headers]
+
+    for sr, item in enumerate(shipment.get('items', []), start=1):
+        qty_unit = str(item.get('quantity', ''))
+        uom = item.get('unit_of_measure', '')
+        if uom:
+            qty_unit += f" {uom}"
+        goods_data.append([
+            Paragraph(str(sr), td_c),
+            Paragraph(item.get('hs_code', ''), td_c),
+            Paragraph(item.get('description', ''), td_l),
+            Paragraph(qty_unit, td_c),
+            Paragraph(f"{float(item.get('gross_weight', 0) or 0):.2f}", td_c),
+            Paragraph(f"{invoice_number}<br/>{shipment.get('po_date', '')}", td_c),
+        ])
+
+    goods_table = Table(goods_data, colWidths=goods_col_widths, repeatRows=1)
+    goods_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0f172a')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('ALIGN', (2, 1), (2, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 3),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+    ]))
+    elements.append(goods_table)
+    elements.append(Spacer(1, 0.12*inch))
+
+    # ========== BOX 5: Declaration ==========
+    declaration_txt = (
+        "The undersigned hereby declares that the above details are correct, that all the goods "
+        "were produced in <b>INDIA</b>, and that they comply with the origin requirements."
+    )
+    decl_data = [[Paragraph(f"<b>DECLARATION</b><br/>{declaration_txt}", value_s)]]
+    decl_table = Table(decl_data, colWidths=[7.0*inch])
+    decl_table.setStyle(BOX_STYLE)
+    elements.append(decl_table)
+    elements.append(Spacer(1, 0.12*inch))
+
+    # ========== BOX 6: Signature Block ==========
+    sig_header = Paragraph(f"<b>For {profile['company_name']}</b>",
+                           ParagraphStyle('COOSigHdr', parent=styles['Normal'],
+                                         fontSize=10, alignment=TA_CENTER))
+    if profile.get('signature_image_url'):
+        sig_path = UPLOADS_DIR / profile['signature_image_url'].split('/')[-1]
+        sig_img = Image(str(sig_path), width=1.8*inch, height=0.8*inch) if sig_path.exists() else Spacer(1, 0.8*inch)
+    else:
+        sig_img = Spacer(1, 0.8*inch)
+
+    sig_footer = Paragraph("Authorized Signatory",
+                           ParagraphStyle('COOSigFtr', parent=styles['Normal'],
+                                         fontSize=9, alignment=TA_CENTER))
+    place_date = Paragraph("Place &amp; Date: ___________________________",
+                           ParagraphStyle('COOPlaceDate', parent=styles['Normal'],
+                                         fontSize=9, alignment=TA_CENTER))
+
+    sig_inner = Table([[sig_header], [sig_img], [sig_footer], [place_date]],
+                      colWidths=[3.0*inch])
+    sig_inner.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]))
+
+    sig_data = [[sig_inner]]
+    sig_table = Table(sig_data, colWidths=[7.0*inch])
+    sig_table.setStyle(BOX_STYLE)
+    elements.append(sig_table)
+    elements.append(Spacer(1, 0.1*inch))
+
+    # ========== Preferential Treatment note ==========
+    pref_style = ParagraphStyle('COOPref', parent=styles['Normal'],
+                                fontSize=8, fontName='Helvetica-Oblique',
+                                alignment=TA_CENTER, textColor=colors.grey)
+    elements.append(Paragraph(
+        "Preferential Treatment Claimed Under: _______________________",
+        pref_style
+    ))
+
+    doc.build(elements)
+    return FileResponse(str(pdf_path), media_type='application/pdf', filename=pdf_filename)
+
 
 # FEATURE 3: GST GSTR-1 Export
 @app.get("/api/reports/gstr1-export")
@@ -1169,18 +1789,22 @@ async def export_gstr1_data(user_id: str = Depends(verify_token)):
     writer.writerow([
         'Invoice Number',
         'Invoice Date',
+        'Buyer Name',
+        'Currency',
         'Port Code',
         'Total Value',
         'Taxable Value',
         'Integrated Tax Amount'
     ])
-    
+
     for shipment in shipments:
         total_value = sum(item.get('total_amount', 0) for item in shipment.get('items', []))
         writer.writerow([
-            shipment.get('po_number', ''),
+            shipment.get('invoice_number', shipment.get('po_number', '')),
             shipment.get('po_date', ''),
-            'INNSA1',  # Default port code
+            shipment.get('buyer_name', ''),
+            shipment.get('currency', 'USD'),
+            shipment.get('port_of_loading', 'INNSA1'),
             f"{total_value:.2f}",
             f"{total_value:.2f}",  # Assuming taxable value = total for exports
             '0.00'  # Zero-rated exports
@@ -1293,7 +1917,7 @@ async def export_tally_xml(shipment_id: str, user_id: str = Depends(verify_token
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "healthy", "service": "ExportAssist API v2.0"}
+    return {"status": "healthy", "service": "TradesdocAi API v2.1"}
 
 if __name__ == "__main__":
     import uvicorn

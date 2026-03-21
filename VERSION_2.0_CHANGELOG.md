@@ -1,8 +1,8 @@
-# ExportAssist Version 2.0 - Changelog
+# TradesdocAi Version 2.0 - Changelog
 
 ## 🎉 Major Upgrade: Critical Business Operations Features
 
-Version 2.0 introduces four game-changing features that transform ExportAssist from a basic documentation tool into a complete export business management system.
+Version 2.0 introduces four game-changing features that transform TradesdocAi from a basic documentation tool into a complete export business management system.
 
 ---
 

@@ -1,5 +1,5 @@
 """
-ExportAssist API Tests
+TradesdocAi API Tests
 Tests for: Auth, Profile, Shipments (with new logistics fields), PDF Generation
 """
 import pytest
@@ -27,7 +27,7 @@ class TestHealthCheck:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "healthy"
-        assert "ExportAssist" in data["service"]
+        assert "TradesdocAi" in data["service"]
         print(f"✓ Health check passed: {data}")
 
 

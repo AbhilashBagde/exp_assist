@@ -1,7 +1,7 @@
-# ExportAssist - Product Requirements Document
+# TradesdocAi - Product Requirements Document
 
 ## Overview
-ExportAssist is a B2B SaaS application for Indian Exporters that automates export documentation. Users upload Purchase Orders (PDFs/Images), AI extracts data and predicts HS Codes, and the system generates compliant Commercial Invoice and Packing List PDFs.
+TradesdocAi is a B2B SaaS application for Indian Exporters that automates export documentation. Users upload Purchase Orders (PDFs/Images), AI extracts data and predicts HS Codes, and the system generates compliant Commercial Invoice and Packing List PDFs.
 
 ## Tech Stack
 - **Frontend**: React, Tailwind CSS, Axios

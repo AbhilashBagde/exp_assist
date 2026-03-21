@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Plus, Settings as SettingsIcon, LogOut, FileText, Calendar, User, Lock, Crown } from 'lucide-react';
+import { Plus, Settings as SettingsIcon, LogOut, FileText, Calendar, User, Lock, Crown, Search, Trash2, RotateCcw, Filter, XCircle, AlertTriangle, CheckCircle, ClipboardCheck } from 'lucide-react';
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -9,6 +9,13 @@ function Dashboard() {
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(null); // shipment_id to delete
+  const [showRevertModal, setShowRevertModal] = useState(null); // shipment_id to revert
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [validating, setValidating] = useState(null);
+  const [validationResults, setValidationResults] = useState({});
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
   const isProMember = localStorage.getItem('is_pro_member') === 'true';
@@ -32,7 +39,15 @@ function Dashboard() {
 
   const fetchShipments = useCallback(async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/shipments`, {
+      let url = `${API_URL}/api/shipments`;
+      // Use search endpoint if filters are active
+      if (searchQuery || statusFilter) {
+        const params = new URLSearchParams();
+        if (searchQuery) params.append('q', searchQuery);
+        if (statusFilter) params.append('status_filter', statusFilter);
+        url = `${API_URL}/api/shipments/search?${params.toString()}`;
+      }
+      const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setShipments(response.data);
@@ -45,7 +60,7 @@ function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, [token, navigate]);
+  }, [token, navigate, searchQuery, statusFilter]);
 
   useEffect(() => {
     checkProfile();
@@ -68,8 +83,8 @@ function Dashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-3">
-              <Package className="w-8 h-8" />
-              <h1 className="text-2xl font-bold">ExportAssist</h1>
+              <img src="/TDA.png" alt="TradesdocAi Logo" className="w-8 h-8 rounded-full object-contain" />
+              <h1 className="text-2xl font-bold">TradesdocAi</h1>
             </div>
             <div className="flex items-center space-x-4">
               <button
@@ -209,7 +224,8 @@ function Dashboard() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {shipments.map((shipment) => (
-                    <tr key={shipment._id} className="hover:bg-gray-50" data-testid={`shipment-row-${shipment._id}`}>
+                    <React.Fragment key={shipment._id}>
+                    <tr className="hover:bg-gray-50" data-testid={`shipment-row-${shipment._id}`}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         <div className="flex items-center">
                           <Calendar className="w-4 h-4 mr-2 text-slate" />
@@ -241,6 +257,30 @@ function Dashboard() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {shipment.status === 'Draft' && (
+                          <button
+                            onClick={async () => {
+                              setValidating(shipment._id);
+                              try {
+                                const response = await axios.get(
+                                  `${API_URL}/api/shipments/${shipment._id}/validate`,
+                                  { headers: { Authorization: `Bearer ${token}` } }
+                                );
+                                setValidationResults(prev => ({ ...prev, [shipment._id]: response.data }));
+                              } catch (err) {
+                                console.error('Validation failed:', err);
+                              } finally {
+                                setValidating(null);
+                              }
+                            }}
+                            disabled={validating === shipment._id}
+                            className="font-medium text-blue-600 hover:text-blue-800 flex items-center space-x-1 disabled:opacity-50"
+                            data-testid={`validate-${shipment._id}`}
+                          >
+                            <ClipboardCheck className="w-4 h-4" />
+                            <span>{validating === shipment._id ? 'Checking…' : 'Validate'}</span>
+                          </button>
+                        )}
                         {shipment.status === 'Final' && (
                           <div className="flex flex-col space-y-1">
                             {shipment.pdf_url && (
@@ -291,6 +331,43 @@ function Dashboard() {
                               {!isProMember && <Lock className="w-3 h-3 mr-1" />}
                               📦 Packing List
                             </button>
+                            {/* Certificate of Origin - Pro Feature */}
+                            <button
+                              onClick={() => {
+                                if (!isProMember) {
+                                  setShowUpgradeModal(true);
+                                  return;
+                                }
+                                (async () => {
+                                  try {
+                                    const response = await axios.post(
+                                      `${API_URL}/api/shipments/${shipment._id}/generate-coo`,
+                                      {},
+                                      {
+                                        headers: { Authorization: `Bearer ${token}` },
+                                        responseType: 'blob'
+                                      }
+                                    );
+                                    const url = window.URL.createObjectURL(new Blob([response.data]));
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.setAttribute('download', `coo_${shipment._id}.pdf`);
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    link.remove();
+                                  } catch (err) {
+                                    console.error('Error downloading COO:', err);
+                                  }
+                                })();
+                              }}
+                              className={`font-medium text-left flex items-center ${
+                                isProMember ? 'text-green-600 hover:text-green-800' : 'text-gray-400 cursor-not-allowed'
+                              }`}
+                              data-testid={`coo-${shipment._id}`}
+                            >
+                              {!isProMember && <Lock className="w-3 h-3 mr-1" />}
+                              🌿 Certificate of Origin
+                            </button>
                             {/* Tally Export - Pro Feature */}
                             <button
                               onClick={() => {
@@ -332,6 +409,52 @@ function Dashboard() {
                         )}
                       </td>
                     </tr>
+                    {validationResults[shipment._id] && (() => {
+                      const vr = validationResults[shipment._id];
+                      const scoreBg = vr.score >= 80 ? 'bg-green-100 text-green-800' : vr.score >= 50 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800';
+                      return (
+                        <tr data-testid={`validation-panel-${shipment._id}`}>
+                          <td colSpan={6} className="px-6 py-3 bg-gray-50 border-t border-gray-200">
+                            <div className="flex items-start justify-between mb-2">
+                              <span className="text-sm font-semibold text-gray-700">Validation Report</span>
+                              <div className="flex items-center space-x-2">
+                                <span className={`text-xs font-bold px-2 py-1 rounded-full ${scoreBg}`}>
+                                  Score: {vr.score}%
+                                </span>
+                                <button
+                                  onClick={() => setValidationResults(prev => { const n = {...prev}; delete n[shipment._id]; return n; })}
+                                  className="text-gray-400 hover:text-gray-600 text-xs"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+                            {vr.errors.length === 0 && vr.warnings.length === 0 ? (
+                              <div className="flex items-center space-x-2 text-green-700 text-sm">
+                                <CheckCircle className="w-4 h-4" />
+                                <span>All checks passed!</span>
+                              </div>
+                            ) : (
+                              <div className="space-y-1">
+                                {vr.errors.map((msg, i) => (
+                                  <div key={i} className="flex items-start space-x-2 text-red-700 text-xs">
+                                    <XCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                                    <span>{msg}</span>
+                                  </div>
+                                ))}
+                                {vr.warnings.map((msg, i) => (
+                                  <div key={i} className="flex items-start space-x-2 text-yellow-700 text-xs">
+                                    <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                                    <span>{msg}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })()}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>
@@ -348,7 +471,7 @@ function Dashboard() {
               <Lock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-2xl font-bold text-navy mb-2">Upgrade to Pro</h3>
               <p className="text-gray-600 mb-6">
-                Unlock Tally XML Export, GST Reports, and Packing Lists with ExportAssist Pro.
+                Unlock Tally XML Export, GST Reports, and Packing Lists with TradesdocAi Pro.
               </p>
               <div className="space-y-3">
                 <button

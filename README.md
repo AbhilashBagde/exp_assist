@@ -1,4 +1,4 @@
-# ExportAssist - Automated Documentation Tool for Indian Exporters
+# TradesdocAi - Automated Documentation Tool for Indian Exporters
 
 A scalable B2B SaaS application that automates documentation for Indian exporters by using AI Vision to extract data from Purchase Orders and generate compliant Commercial Invoices.
 
@@ -46,7 +46,7 @@ pip install -r requirements.txt
 
 # Configure environment variables
 # Edit .env file with your settings:
-MONGO_URL=mongodb://localhost:27017/exportassist
+MONGO_URL=mongodb://localhost:27017/tradesdocai
 JWT_SECRET=your-secret-key-change-in-production
 GEMINI_API_KEY=your-gemini-api-key-here
 ```
@@ -315,7 +315,7 @@ yarn install
 
 ## 📄 License
 
-Proprietary - ExportAssist B2B SaaS
+Proprietary - TradesdocAi B2B SaaS
 
 ## 👥 Support
 

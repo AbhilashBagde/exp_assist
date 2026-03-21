@@ -1,4 +1,4 @@
-# AI Currency Detection Update - ExportAssist v2.0.2
+# AI Currency Detection Update - TradesdocAi v2.0.2
 
 ## 🤖 Intelligent Currency Detection from Documents
 
@@ -155,7 +155,7 @@ Turmeric Powder   500   120.00       60,000.00
 
 ### Test 1: INR Detection
 1. Create a PO document with "₹" symbols
-2. Upload to ExportAssist
+2. Upload to TradesdocAi
 3. Click "Start AI Extraction"
 4. Verify: Currency dropdown shows "INR"
 5. Verify: Headers show "Rate (INR)"

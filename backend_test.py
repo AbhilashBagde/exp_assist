@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 import os
 
-class ExportAssistAPITester:
+class TradesdocAiAPITester:
     def __init__(self, base_url="http://localhost:8001"):
         self.base_url = base_url
         self.token = None
@@ -322,11 +322,11 @@ class ExportAssistAPITester:
         return success
 
 def main():
-    print("🚀 Starting ExportAssist API Tests")
+    print("🚀 Starting TradesdocAi API Tests")
     print("=" * 50)
     
     # Initialize tester
-    tester = ExportAssistAPITester()
+    tester = TradesdocAiAPITester()
     
     # Run tests in sequence
     tests = [

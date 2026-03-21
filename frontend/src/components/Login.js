@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Lock, Package } from 'lucide-react';
+import { Mail, Lock } from 'lucide-react';
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -41,11 +41,9 @@ function Login({ isSignup = false }) {
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <div className="bg-navy p-3 rounded-full">
-              <Package className="w-8 h-8 text-white" />
-            </div>
+            <img src="/TDA.png" alt="TradesdocAi Logo" className="w-16 h-16 rounded-full object-contain" />
           </div>
-          <h1 className="text-3xl font-bold text-navy" data-testid="app-title">ExportAssist</h1>
+          <h1 className="text-3xl font-bold text-navy" data-testid="app-title">TradesdocAi</h1>
           <p className="text-slate mt-2">
             {isSignup ? 'Create your account' : 'Welcome back'}
           </p>
@@ -124,7 +122,7 @@ function Login({ isSignup = false }) {
           <p className="text-xs text-gray-500 text-center leading-relaxed">
             <strong>Disclaimer:</strong> This document is generated using AI assistance. 
             The Exporter is solely responsible for verifying all data, including HS Codes 
-            and values, before submission to Customs. ExportAssist assumes no liability 
+            and values, before submission to Customs. TradesdocAi assumes no liability 
             for errors or non-compliance.
           </p>
         </div>
