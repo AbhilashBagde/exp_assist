@@ -637,9 +637,6 @@ async def extract_po_data(
         else:
             page_images = [PILImage.open(io.BytesIO(file_content))]
         
-        # Use Gemini 2.5 Flash (stable multimodal model)
-        model = genai.GenerativeModel('models/gemini-2.5-flash')
-        
         prompt = """You are an expert at reading Indian export Purchase Order documents. Extract ALL fields carefully and return ONLY a valid JSON object with no markdown or extra text.
 
 {
@@ -689,8 +686,21 @@ CURRENCY DETECTION:
 - Default → "USD"
 
 Return ONLY the JSON object, no additional text or markdown."""
-        
-        response = model.generate_content([prompt] + page_images)
+
+        # Try multimodal models in order, fall back on any error
+        extraction_models = ['models/gemini-3-flash', 'models/gemini-2.5-flash', 'models/gemini-1.5-flash']
+        response = None
+        last_error = None
+        for model_name in extraction_models:
+            try:
+                m = genai.GenerativeModel(model_name)
+                response = m.generate_content([prompt] + page_images)
+                break
+            except Exception as e:
+                last_error = e
+                continue
+        if response is None:
+            raise last_error
         
         # Parse the response
         result_text = response.text.strip()
@@ -767,34 +777,25 @@ async def suggest_hs_code(
     try:
         prompt = f"""You are an expert in Indian ITC-HS Code classification for export goods.
 
-Based on the following product description, predict the most appropriate Indian ITC-HS Code (6 or 8 digits).
+Based on the following product description, predict the most appropriate Indian ITC-HS Code.
 
 Product Description: "{description}"
 
 Respond with ONLY a JSON object in this exact format:
 {{
-  "hs_code": "XXXX.XX",
+  "hs_code": "XXXXXXXX",
   "confidence": "high/medium/low",
   "category": "Brief category name",
-  "notes": "Brief explanation of why this code was chosen"
+  "notes": "Brief explanation"
 }}
 
-Common HS Code examples for reference:
-- Basmati Rice: 1006.30
-- Cotton Fabric: 5208.00
-- Tea: 0902.00
-- Spices (Turmeric): 0910.30
-- Leather goods: 4202.00
-- Textiles/Garments: 6109.00
-- Machinery parts: 8479.00
-- Chemicals: 2933.00
-- Pharmaceuticals: 3004.00
-- Jewelry: 7113.00
+CRITICAL: hs_code must be EXACTLY 8 digits with NO dots, dashes or spaces.
+Examples: Basmati Rice -> "10063000", Sunflower Oil -> "15121100", Cotton Fabric -> "52081200", Tea -> "09024090"
 
 Return ONLY the JSON object, no additional text."""
 
-        # Try models in order; fall back to next if rate-limited (429)
-        models_to_try = ['models/gemini-2.0-flash', 'models/gemini-2.5-flash', 'models/gemini-1.5-flash']
+        # Try all models in order, falling back on ANY error
+        models_to_try = ['models/gemini-3-flash', 'models/gemini-2.5-flash', 'models/gemini-1.5-flash']
         response = None
         last_error = None
         for model_name in models_to_try:
@@ -804,14 +805,11 @@ Return ONLY the JSON object, no additional text."""
                 break
             except Exception as e:
                 last_error = e
-                if '429' not in str(e) and 'quota' not in str(e).lower():
-                    raise  # Only fall back for rate-limit errors
-                continue
+                continue  # always try next model
         if response is None:
             raise last_error
+
         result_text = response.text.strip()
-        
-        # Clean up response
         if result_text.startswith('```json'):
             result_text = result_text[7:]
         if result_text.startswith('```'):
@@ -819,30 +817,28 @@ Return ONLY the JSON object, no additional text."""
         if result_text.endswith('```'):
             result_text = result_text[:-3]
         result_text = result_text.strip()
-        
-        # Parse JSON
+
         suggestion = json.loads(result_text)
-        
+
+        # Normalize hs_code: strip non-digits, pad to 8
+        raw = re.sub(r'[^0-9]', '', str(suggestion.get("hs_code", "")))
+        if len(raw) == 6:
+            raw += '00'
+        hs_code = raw[:8] if len(raw) >= 6 else raw
+
         return {
             "success": True,
-            "hs_code": suggestion.get("hs_code", ""),
+            "hs_code": hs_code,
             "confidence": suggestion.get("confidence", "medium"),
             "category": suggestion.get("category", ""),
             "notes": suggestion.get("notes", "")
         }
-        
+
     except json.JSONDecodeError:
-        # If JSON parsing fails, try to extract HS code from text
-        import re
-        hs_match = re.search(r'\d{4}\.\d{2}', response.text if 'response' in dir() else '')
+        hs_match = re.search(r'\d{6,8}', response.text if response else '')
         if hs_match:
-            return {
-                "success": True,
-                "hs_code": hs_match.group(),
-                "confidence": "low",
-                "category": "",
-                "notes": "Extracted from AI response"
-            }
+            raw = hs_match.group()[:8]
+            return {"success": True, "hs_code": raw, "confidence": "low", "category": "", "notes": "Extracted from AI response"}
         raise HTTPException(status_code=500, detail="Failed to parse AI response")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"HS Code suggestion failed: {str(e)}")
