@@ -717,9 +717,10 @@ Return ONLY the JSON object, no additional text or markdown."""
         
         # Parse JSON
         extracted_data = json.loads(result_text)
-        
+        print("DEBUG extraction raw:", json.dumps(extracted_data, indent=2)[:2000])
+
         items = extracted_data.get('items', [])
-        doc_tariff = extracted_data.get('tariff_code', '')
+        doc_tariff = extracted_data.get('tariff_code') or ''  # treat null as ''
         total_net = extracted_data.get('total_net_weight') or 0
         total_gross = extracted_data.get('total_gross_weight') or 0
         n_items = len(items) if items else 1

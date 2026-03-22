@@ -197,6 +197,7 @@ function NewShipment() {
 
       // Map currency_code from AI to currency field
       const extractedData = response.data;
+      console.log('EXTRACTION RESULT:', JSON.stringify(extractedData, null, 2));
       if (extractedData.currency_code) {
         extractedData.currency = extractedData.currency_code;
       }
