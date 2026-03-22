@@ -106,17 +106,6 @@ function NewShipment() {
     axios.get(`${API_URL}/api/next-invoice-number`, {
       headers: { Authorization: `Bearer ${token}` }
     }).then(res => setInvoiceNumber(res.data.invoice_number)).catch(() => {});
-    // Step 1: immediately copy document-level tariff_code to items missing hs_code
-    const docTariff = (formData.tariff_code || '').replace(/[^0-9]/g, '');
-    const paddedTariff = docTariff.length === 6 ? docTariff + '00' : docTariff.slice(0, 8);
-    if (paddedTariff.length >= 6) {
-      setFormData(prev => ({
-        ...prev,
-        items: prev.items.map(item =>
-          !item.hs_code ? { ...item, hs_code: paddedTariff } : item
-        )
-      }));
-    }
     // Check profile completeness
     axios.get(`${API_URL}/api/profile`, {
       headers: { Authorization: `Bearer ${token}` }
@@ -200,6 +189,16 @@ function NewShipment() {
       console.log('EXTRACTION RESULT:', JSON.stringify(extractedData, null, 2));
       if (extractedData.currency_code) {
         extractedData.currency = extractedData.currency_code;
+      }
+
+      // Guarantee hs_code is set: use item-level code, then fall back to doc tariff_code
+      const docTariff = (extractedData.tariff_code || '').replace(/[^0-9]/g, '');
+      const paddedTariff = docTariff.length === 6 ? docTariff + '00' : docTariff.slice(0, 8);
+      if (extractedData.items && paddedTariff.length >= 6) {
+        extractedData.items = extractedData.items.map(item => ({
+          ...item,
+          hs_code: item.hs_code || paddedTariff
+        }));
       }
 
       setFormData(extractedData);
