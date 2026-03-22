@@ -106,6 +106,14 @@ function NewShipment() {
     axios.get(`${API_URL}/api/next-invoice-number`, {
       headers: { Authorization: `Bearer ${token}` }
     }).then(res => setInvoiceNumber(res.data.invoice_number)).catch(() => {});
+    // Auto-suggest HS codes for any items missing them (small delay so state settles)
+    const timer = setTimeout(() => {
+      const needsSuggestion = formData.items.some(
+        item => !item.hs_code && item.description?.trim().length >= 3
+      );
+      if (needsSuggestion) suggestAllHsCodes();
+    }, 800);
+    return () => clearTimeout(timer);
     // Check profile completeness
     axios.get(`${API_URL}/api/profile`, {
       headers: { Authorization: `Bearer ${token}` }

@@ -720,12 +720,15 @@ Return ONLY the JSON object, no additional text or markdown."""
             item['unit_price'] = float(item.get('unit_price') or 0)
             item['total_amount'] = round(item['quantity'] * item['unit_price'], 2)
 
-            # Propagate document-level tariff code to items that have no hs_code
-            if not item.get('hs_code') and doc_tariff:
-                hs = re.sub(r'[^0-9]', '', str(doc_tariff))
-                if len(hs) == 6:
-                    hs += '00'
-                item['hs_code'] = hs[:8]
+            # Normalize hs_code: strip dots/spaces, pad to 8 digits
+            # Use item-level code first, fall back to document tariff_code
+            raw_hs = str(item.get('hs_code') or '').strip()
+            if not raw_hs and doc_tariff:
+                raw_hs = str(doc_tariff).strip()
+            hs = re.sub(r'[^0-9]', '', raw_hs)  # strip dots, spaces, dashes
+            if len(hs) == 6:
+                hs += '00'
+            item['hs_code'] = hs[:8] if len(hs) >= 6 else ''
 
             # Distribute document-level net/gross weight if per-item weights are missing
             if not item.get('net_weight') and total_net:
