@@ -106,14 +106,19 @@ function NewShipment() {
     axios.get(`${API_URL}/api/next-invoice-number`, {
       headers: { Authorization: `Bearer ${token}` }
     }).then(res => setInvoiceNumber(res.data.invoice_number)).catch(() => {});
-    // Auto-suggest HS codes for any items missing them (small delay so state settles)
-    const timer = setTimeout(() => {
-      const needsSuggestion = formData.items.some(
-        item => !item.hs_code && item.description?.trim().length >= 3
-      );
-      if (needsSuggestion) suggestAllHsCodes();
-    }, 800);
-    return () => clearTimeout(timer);
+    // Step 1: immediately copy document-level tariff_code to items missing hs_code
+    const docTariff = (formData.tariff_code || '').replace(/[^0-9]/g, '');
+    const paddedTariff = docTariff.length === 6 ? docTariff + '00' : docTariff.slice(0, 8);
+    if (paddedTariff.length >= 6) {
+      setFormData(prev => ({
+        ...prev,
+        items: prev.items.map(item =>
+          !item.hs_code ? { ...item, hs_code: paddedTariff } : item
+        )
+      }));
+    }
+    // Step 2: for any still-missing hs_codes, call AI suggest after a short delay
+    const timer = setTimeout(() => suggestAllHsCodes(), 1000);
     // Check profile completeness
     axios.get(`${API_URL}/api/profile`, {
       headers: { Authorization: `Bearer ${token}` }
@@ -126,6 +131,7 @@ function NewShipment() {
       if (!p.iec_code) missing.push('IEC code');
       if (missing.length) setProfileWarning(`Profile missing: ${missing.join(', ')}. These fields will be blank on the invoice.`);
     }).catch(() => {});
+    return () => clearTimeout(timer);
   }, [step, token]);
 
   // Update exchange rate when currency changes
