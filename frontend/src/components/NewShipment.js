@@ -117,8 +117,6 @@ function NewShipment() {
         )
       }));
     }
-    // Step 2: for any still-missing hs_codes, call AI suggest after a short delay
-    const timer = setTimeout(() => suggestAllHsCodes(), 1000);
     // Check profile completeness
     axios.get(`${API_URL}/api/profile`, {
       headers: { Authorization: `Bearer ${token}` }
@@ -131,7 +129,6 @@ function NewShipment() {
       if (!p.iec_code) missing.push('IEC code');
       if (missing.length) setProfileWarning(`Profile missing: ${missing.join(', ')}. These fields will be blank on the invoice.`);
     }).catch(() => {});
-    return () => clearTimeout(timer);
   }, [step, token]);
 
   // Update exchange rate when currency changes
@@ -309,13 +306,12 @@ function NewShipment() {
       });
 
       if (response.data.success) {
-        // Update the HS code for this item
-        const updatedItems = [...formData.items];
-        updatedItems[index] = {
-          ...updatedItems[index],
-          hs_code: response.data.hs_code
-        };
-        setFormData({ ...formData, items: updatedItems });
+        const suggestedHsCode = response.data.hs_code;
+        setFormData(prev => {
+          const updatedItems = [...prev.items];
+          updatedItems[index] = { ...updatedItems[index], hs_code: suggestedHsCode };
+          return { ...prev, items: updatedItems };
+        });
         
         // Show confidence info
         if (response.data.confidence === 'low') {
@@ -351,7 +347,7 @@ function NewShipment() {
 
     setSuggestingAll(true);
     setError('');
-    let updatedItems = [...formData.items];
+    const hsUpdates = {};
 
     for (const { item, index } of itemsNeedingCodes) {
       setSuggestingHsCode(index);
@@ -362,7 +358,7 @@ function NewShipment() {
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
         });
         if (response.data.success && response.data.hs_code) {
-          updatedItems[index] = { ...updatedItems[index], hs_code: response.data.hs_code };
+          hsUpdates[index] = response.data.hs_code;
         }
       } catch (err) {
         const detail = err.response?.data?.detail;
@@ -370,7 +366,12 @@ function NewShipment() {
       }
     }
 
-    setFormData({ ...formData, items: updatedItems });
+    setFormData(prev => ({
+      ...prev,
+      items: prev.items.map((item, i) =>
+        hsUpdates[i] ? { ...item, hs_code: hsUpdates[i] } : item
+      )
+    }));
     setSuggestingHsCode(null);
     setSuggestingAll(false);
   };
