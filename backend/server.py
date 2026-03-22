@@ -640,52 +640,53 @@ async def extract_po_data(
         # Use Gemini 2.5 Flash (stable multimodal model)
         model = genai.GenerativeModel('models/gemini-2.5-flash')
         
-        prompt = """Analyze this Indian export Purchase Order document image. Extract the following information and return ONLY a valid JSON object with no additional text or markdown.
+        prompt = """You are an expert at reading Indian export Purchase Order documents. Extract ALL fields carefully and return ONLY a valid JSON object with no markdown or extra text.
 
 {
-  "buyer_name": "Name of the buyer/importer",
+  "buyer_name": "Name of the buyer/importer company",
   "buyer_address": "Full address of the buyer",
   "po_number": "Purchase Order number",
   "po_date": "Date in YYYY-MM-DD format, or null if not found",
-  "currency_code": "Detected currency code (e.g. USD, EUR, GBP, AED, SGD, INR)",
-  "consignee": "Party to whom goods are consigned — may differ from buyer; null if not stated",
-  "notify_party": "Party to be notified on arrival of shipment; null if not stated",
-  "payment_terms": "Full payment terms as written (e.g. 'T/T 30 days after BL', 'Letter of Credit at sight', 'DA 60 days'); null if not stated",
+  "currency_code": "Currency code (USD, EUR, GBP, AED, SGD, INR)",
+  "consignee": "Consignee if different from buyer; null if not stated",
+  "notify_party": "Notify party if stated; null if not stated",
+  "payment_terms": "Full payment terms exactly as written; null if not stated",
   "port_of_loading": "Port of loading if specified; null if not stated",
   "port_of_discharge": "Port of discharge / destination port if specified; null if not stated",
   "marks_and_numbers": "Shipping marks or marks & numbers if stated; null if not stated",
-  "tariff_code": "HS/HTS code if the buyer has specified one in the PO; null if not present",
+  "tariff_code": "HS/HTS/Tariff code stated in the PO at document level; null if not present",
+  "total_net_weight": <total net weight as number, kg, or null>,
+  "total_gross_weight": <total gross weight as number, kg, or null>,
   "items": [
     {
-      "description": "Full item description as written",
-      "quantity": <number>,
-      "unit_of_measure": "Unit of measure exactly as written, e.g. KGS, MT, NOS, PCS, LTR, CTN, SET",
-      "unit_price": <number>,
-      "hs_code": "8-digit Indian ITC-HS code as a string with NO dots or spaces, e.g. '10063000'"
+      "description": "Full item description as written in the PO",
+      "quantity": <quantity as a plain number, e.g. 22000>,
+      "unit_of_measure": "Unit exactly as written, e.g. KG, MT, NOS, PCS, LTR, CTN",
+      "unit_price": <price per unit as a plain number, e.g. 1.285 — extract the numeric value only, strip currency symbols and unit text>,
+      "hs_code": "8-digit ITC-HS code as string with NO dots/spaces — use any tariff/HS code stated in the PO for this product; if none stated use your expert knowledge of Indian ITC-HS schedule",
+      "net_weight": <net weight for this line item as number in KG, or 0 if not stated>,
+      "gross_weight": <gross weight for this line item as number in KG, or 0 if not stated>
     }
   ]
 }
 
-CRITICAL - CURRENCY DETECTION:
-Scan the Total, Amount, Rate, and Price columns/fields for:
-- Currency symbols: ₹, $, €, £, ¥, د.إ
-- Currency codes: INR, USD, EUR, GBP, AED, SGD, JPY
-- Text: Rs, Rupees, Dollars
+EXTRACTION RULES:
 
-Rules:
-- ₹ / Rs / Rupees / INR → "INR"
-- $ / USD → "USD"
-- £ / GBP → "GBP"
-- € / EUR → "EUR"
-- د.إ / AED → "AED"
-- S$ / SGD → "SGD"
-- No currency found → "USD"
+QUANTITY: Look for Qty, Quantity, Amount (units). Extract the plain number (e.g. 22000, not "22,000.0000 KG").
 
-CRITICAL - HS CODE FORMAT:
-- Output EXACTLY 8 digits with NO dots, dashes, or spaces
-- Examples: Basmati Rice → "10063000", Cotton Woven Fabric → "52081200", Black Tea → "09024090"
-- If you predict only 6 digits, append "00" to make it 8 digits
-- Use your knowledge of the Indian ITC-HS classification schedule
+UNIT PRICE / RATE: Look for Rate, Price, Unit Price, Price/Unit columns. Extract ONLY the numeric value (e.g. if you see "1.2850 USD / KG" extract 1.2850).
+
+NET / GROSS WEIGHT: Look for Net Wt, Gross Wt, Net Weight, Gross Weight anywhere in the document including marks/shipping sections. Distribute total weight across items proportionally if per-item weight is not stated.
+
+HS CODE PER ITEM (CRITICAL):
+- If the PO states a Tariff Code, HS Code, or HTS Code anywhere, USE IT for the relevant item
+- Format as EXACTLY 8 digits, NO dots, dashes, or spaces (e.g. "15121100" not "1512.11")
+- If only 6 digits given, append "00" (e.g. "151211" → "15121100")
+- If no code is stated, use your expert knowledge of the Indian ITC-HS schedule to predict the correct 8-digit code
+
+CURRENCY DETECTION:
+- $ / USD → "USD" | £ / GBP → "GBP" | € / EUR → "EUR" | ₹ / Rs / INR → "INR" | د.إ / AED → "AED" | S$ / SGD → "SGD"
+- Default → "USD"
 
 Return ONLY the JSON object, no additional text or markdown."""
         
@@ -707,10 +708,42 @@ Return ONLY the JSON object, no additional text or markdown."""
         # Parse JSON
         extracted_data = json.loads(result_text)
         
-        # Calculate total_amount for each item
-        for item in extracted_data.get('items', []):
-            item['total_amount'] = item['quantity'] * item['unit_price']
-        
+        items = extracted_data.get('items', [])
+        doc_tariff = extracted_data.get('tariff_code', '')
+        total_net = extracted_data.get('total_net_weight') or 0
+        total_gross = extracted_data.get('total_gross_weight') or 0
+        n_items = len(items) if items else 1
+
+        for item in items:
+            # Ensure numeric types
+            item['quantity'] = float(item.get('quantity') or 0)
+            item['unit_price'] = float(item.get('unit_price') or 0)
+            item['total_amount'] = round(item['quantity'] * item['unit_price'], 2)
+
+            # Propagate document-level tariff code to items that have no hs_code
+            if not item.get('hs_code') and doc_tariff:
+                hs = re.sub(r'[^0-9]', '', str(doc_tariff))
+                if len(hs) == 6:
+                    hs += '00'
+                item['hs_code'] = hs[:8]
+
+            # Distribute document-level net/gross weight if per-item weights are missing
+            if not item.get('net_weight') and total_net:
+                item['net_weight'] = round(total_net / n_items, 2)
+            else:
+                item['net_weight'] = float(item.get('net_weight') or 0)
+
+            if not item.get('gross_weight') and total_gross:
+                item['gross_weight'] = round(total_gross / n_items, 2)
+            else:
+                item['gross_weight'] = float(item.get('gross_weight') or 0)
+
+            # Ensure remaining dimension fields exist
+            item.setdefault('length_cm', 0)
+            item.setdefault('width_cm', 0)
+            item.setdefault('height_cm', 0)
+
+        extracted_data['items'] = items
         return extracted_data
         
     except Exception as e:
