@@ -355,10 +355,13 @@ function NewShipment() {
         const response = await axios.post(`${API_URL}/api/suggest-hs-code`, fd, {
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
         });
-        if (response.data.success) {
+        if (response.data.success && response.data.hs_code) {
           updatedItems[index] = { ...updatedItems[index], hs_code: response.data.hs_code };
         }
-      } catch (_) {}
+      } catch (err) {
+        const detail = err.response?.data?.detail;
+        setError(`HS Code suggestion failed: ${typeof detail === 'string' ? detail : 'Please try again or enter manually'}`);
+      }
     }
 
     setFormData({ ...formData, items: updatedItems });
