@@ -688,7 +688,7 @@ CURRENCY DETECTION:
 Return ONLY the JSON object, no additional text or markdown."""
 
         # Try multimodal models in order, fall back on any error
-        extraction_models = ['models/gemini-3-flash', 'models/gemini-2.5-flash', 'models/gemini-1.5-flash']
+        extraction_models = ['models/gemini-2.5-pro', 'models/gemini-2.5-flash', 'models/gemini-1.5-flash']
         response = None
         last_error = None
         for model_name in extraction_models:
@@ -795,7 +795,7 @@ Examples: Basmati Rice -> "10063000", Sunflower Oil -> "15121100", Cotton Fabric
 Return ONLY the JSON object, no additional text."""
 
         # Try all models in order, falling back on ANY error
-        models_to_try = ['models/gemini-3-flash', 'models/gemini-2.5-flash', 'models/gemini-1.5-flash']
+        models_to_try = ['models/gemini-2.5-pro', 'models/gemini-2.5-flash', 'models/gemini-1.5-flash']
         response = None
         last_error = None
         for model_name in models_to_try:
