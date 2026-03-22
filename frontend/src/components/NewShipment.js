@@ -95,6 +95,7 @@ function NewShipment() {
   // Auto-save draft whenever form data changes (only on step 3)
   useEffect(() => {
     if (step === 3) {
+      console.log('FORM STATE:', JSON.stringify({ hs: formData.items?.[0]?.hs_code, qty: formData.items?.[0]?.quantity, rate: formData.items?.[0]?.unit_price, total: formData.items?.[0]?.total_amount }));
       localStorage.setItem('shipment_draft', JSON.stringify(formData));
     }
   }, [formData, step]);
