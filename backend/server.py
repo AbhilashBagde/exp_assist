@@ -209,6 +209,22 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) 
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+# Seed demo account on startup (credentials set via env vars)
+DEMO_EMAIL = os.getenv("DEMO_EMAIL", "")
+DEMO_PASSWORD = os.getenv("DEMO_PASSWORD", "")
+
+if DEMO_EMAIL and DEMO_PASSWORD:
+    existing = users_collection.find_one({"email": DEMO_EMAIL})
+    if not existing:
+        _hash = bcrypt.hashpw(DEMO_PASSWORD.encode('utf-8'), bcrypt.gensalt())
+        users_collection.insert_one({
+            "_id": str(__import__('uuid').uuid4()),
+            "email": DEMO_EMAIL,
+            "password_hash": _hash,
+            "is_pro_member": True,
+            "created_at": datetime.utcnow()
+        })
+
 # Auth Endpoints
 @app.post("/api/auth/auto-session")
 async def auto_session():
