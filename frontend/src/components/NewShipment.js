@@ -36,6 +36,7 @@ function NewShipment() {
   const [suggestingAll, setSuggestingAll] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [profileWarning, setProfileWarning] = useState('');
+  const [hasDraft, setHasDraft] = useState(false);
   const [exchangeRate, setExchangeRate] = useState(83.50); // Default USD to INR
   const [exchangeRates, setExchangeRates] = useState({}); // All rates
   const [ratesLoading, setRatesLoading] = useState(false);
@@ -84,15 +85,10 @@ function NewShipment() {
     }
   }, [token]);
 
-  // Restore draft from localStorage on mount
+  // Check for saved draft on mount (don't auto-restore — let user decide)
   useEffect(() => {
-    const saved = localStorage.getItem('shipment_draft');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setFormData(parsed);
-        setStep(3);
-      } catch (_) {}
+    if (localStorage.getItem('shipment_draft')) {
+      setHasDraft(true);
     }
   }, []);
 
@@ -520,6 +516,32 @@ function NewShipment() {
         {/* Step 1: Upload */}
         {step === 1 && (
           <div className="bg-white rounded-lg shadow-md p-8" data-testid="upload-step">
+            {hasDraft && (
+              <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between">
+                <span className="text-blue-800 text-sm font-medium">You have an unsaved draft from a previous session.</span>
+                <div className="flex space-x-3 ml-4">
+                  <button
+                    onClick={() => {
+                      const saved = localStorage.getItem('shipment_draft');
+                      if (saved) {
+                        try { setFormData(JSON.parse(saved)); } catch (_) {}
+                      }
+                      setHasDraft(false);
+                      setStep(3);
+                    }}
+                    className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                  >
+                    Resume Draft
+                  </button>
+                  <button
+                    onClick={() => { localStorage.removeItem('shipment_draft'); setHasDraft(false); }}
+                    className="px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300"
+                  >
+                    Discard
+                  </button>
+                </div>
+              </div>
+            )}
             <h2 className="text-2xl font-bold text-navy mb-4">Upload Purchase Order</h2>
             <p className="text-slate mb-6">Upload a PDF or photo of your Purchase Order document</p>
 
