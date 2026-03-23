@@ -95,7 +95,6 @@ function NewShipment() {
   // Auto-save draft whenever form data changes (only on step 3)
   useEffect(() => {
     if (step === 3) {
-      console.log('FORM STATE:', JSON.stringify({ hs: formData.items?.[0]?.hs_code, qty: formData.items?.[0]?.quantity, rate: formData.items?.[0]?.unit_price, total: formData.items?.[0]?.total_amount }));
       localStorage.setItem('shipment_draft', JSON.stringify(formData));
     }
   }, [formData, step]);
@@ -187,7 +186,6 @@ function NewShipment() {
 
       // Map currency_code from AI to currency field
       const extractedData = response.data;
-      console.log('EXTRACTION RESULT:', JSON.stringify(extractedData, null, 2));
       if (extractedData.currency_code) {
         extractedData.currency = extractedData.currency_code;
       }
@@ -974,21 +972,21 @@ function NewShipment() {
                   <table className="min-w-full border border-gray-200" data-testid="items-table">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Description</th>
-                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase bg-yellow-50">HS Code ⚠️</th>
-                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Qty</th>
-                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Unit</th>
-                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Rate ({formData.currency})</th>
-                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Net Wt (kg)</th>
-                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Gross Wt (kg)</th>
-                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">L (cm)</th>
-                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">W (cm)</th>
-                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">H (cm)</th>
-                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Amount ({formData.currency})</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase min-w-[160px]">Description</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase bg-yellow-50 min-w-[140px]">HS Code ⚠️</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase min-w-[75px]">Qty</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase min-w-[60px]">Unit</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase min-w-[85px]">Rate ({formData.currency})</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase min-w-[80px]">Net Wt (kg)</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase min-w-[90px]">Gross Wt (kg)</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase min-w-[60px]">L (cm)</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase min-w-[60px]">W (cm)</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase min-w-[60px]">H (cm)</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase min-w-[110px]">Amount ({formData.currency})</th>
                         {formData.currency !== 'INR' && (
-                          <th className="px-2 py-3 text-left text-xs font-medium text-green-700 uppercase bg-green-50">Amount (₹ INR)</th>
+                          <th className="px-2 py-3 text-left text-xs font-medium text-green-700 uppercase bg-green-50 min-w-[110px]">Amount (₹ INR)</th>
                         )}
-                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">Action</th>
+                        <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase min-w-[70px]">Action</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
