@@ -190,6 +190,11 @@ function NewShipment() {
         extractedData.currency = extractedData.currency_code;
       }
 
+      // Update exchange rate to match the currency detected from the PO
+      if (extractedData.currency) {
+        updateExchangeRate(extractedData.currency);
+      }
+
       // Guarantee hs_code is set: use item-level code, then fall back to doc tariff_code
       const docTariff = (extractedData.tariff_code || '').replace(/[^0-9]/g, '');
       const paddedTariff = docTariff.length === 6 ? docTariff + '00' : docTariff.slice(0, 8);
