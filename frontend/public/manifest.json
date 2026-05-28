@@ -1,0 +1,26 @@
+{
+  "short_name": "TradesdocAi",
+  "name": "TradesdocAi - Export Documentation",
+  "description": "AI-powered export documentation for Indian exporters",
+  "icons": [
+    {
+      "src": "TDA.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "TDA.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0f172a",
+  "background_color": "#0f172a",
+  "categories": ["business", "productivity"]
+}
