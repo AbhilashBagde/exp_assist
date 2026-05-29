@@ -150,36 +150,48 @@ exchange_rate_cache = {
 }
 
 async def fetch_live_exchange_rates():
-    """Fetch live exchange rates from free API (single call, no API key required)"""
+    """Fetch live exchange rates from free APIs (no API key required)"""
     try:
-        # Check if cache is still valid (less than 1 hour old)
+        # Return cached rates if still valid (less than 1 hour old)
         if exchange_rate_cache["last_updated"]:
             time_diff = datetime.utcnow() - exchange_rate_cache["last_updated"]
             if time_diff.total_seconds() < 3600:
                 return exchange_rate_cache["rates"]
 
+        # Try multiple free APIs in order
+        apis = [
+            {
+                "url": "https://open.er-api.com/v6/latest/USD",
+                "rates_key": "rates",
+            },
+            {
+                "url": "https://api.exchangerate-api.com/v4/latest/USD",
+                "rates_key": "rates",
+            },
+        ]
+
         async with httpx.AsyncClient() as client:
-            # Single call: 1 USD = X of every currency
-            response = await client.get(
-                "https://api.exchangerate-api.com/v4/latest/USD",
-                timeout=10.0
-            )
+            for api in apis:
+                try:
+                    response = await client.get(api["url"], timeout=10.0)
+                    if response.status_code == 200:
+                        data = response.json()
+                        rates = data.get(api["rates_key"], {})
+                        inr_per_usd = rates.get("INR", FALLBACK_RATES_TO_INR["USD"])
 
-            if response.status_code == 200:
-                data = response.json()
-                rates = data.get("rates", {})
-                inr_per_usd = rates.get("INR", FALLBACK_RATES_TO_INR["USD"])
+                        # Convert all currencies to INR: 1 X = (inr_per_usd / usd_per_x) INR
+                        rates_to_inr = {"INR": 1.00}
+                        for cur, usd_rate in rates.items():
+                            if cur != "INR" and usd_rate and usd_rate > 0:
+                                rates_to_inr[cur] = round(inr_per_usd / usd_rate, 4)
 
-                # Convert all currencies to INR: 1 X = (inr_per_usd / usd_per_x) INR
-                rates_to_inr = {"INR": 1.00}
-                for currency, usd_rate in rates.items():
-                    if currency != "INR" and usd_rate and usd_rate > 0:
-                        rates_to_inr[currency] = round(inr_per_usd / usd_rate, 4)
-
-                exchange_rate_cache["rates"] = rates_to_inr
-                exchange_rate_cache["last_updated"] = datetime.utcnow()
-                print(f"Exchange rates updated: 1 USD = {inr_per_usd} INR")
-                return rates_to_inr
+                        exchange_rate_cache["rates"] = rates_to_inr
+                        exchange_rate_cache["last_updated"] = datetime.utcnow()
+                        print(f"Exchange rates updated via {api['url']}: 1 USD = {inr_per_usd} INR")
+                        return rates_to_inr
+                except Exception as api_err:
+                    print(f"API {api['url']} failed: {api_err}")
+                    continue
 
         return exchange_rate_cache["rates"] if exchange_rate_cache["rates"] else FALLBACK_RATES_TO_INR
 
