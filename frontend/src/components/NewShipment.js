@@ -37,22 +37,50 @@ function NewShipment() {
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [profileWarning, setProfileWarning] = useState('');
   const [hasDraft, setHasDraft] = useState(false);
-  const [exchangeRate, setExchangeRate] = useState(83.50); // Default USD to INR
-  const [exchangeRates, setExchangeRates] = useState({}); // All rates
+  const [exchangeRates, setExchangeRates] = useState({});
   const [ratesLoading, setRatesLoading] = useState(false);
   const [isLiveRate, setIsLiveRate] = useState(false);
   const [ratesLastUpdated, setRatesLastUpdated] = useState(null);
+  const [targetCurrency, setTargetCurrency] = useState('INR');
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
 
   // Fallback exchange rates to INR
   const FALLBACK_RATES = {
-    USD: 83.50,
-    EUR: 90.50,
-    GBP: 105.50,
-    AED: 22.75,
-    SGD: 62.00,
-    INR: 1.00
+    USD: 83.50, EUR: 90.50, GBP: 105.50, AED: 22.75, SGD: 62.00,
+    INR: 1.00, JPY: 0.56, CNY: 11.50, CAD: 61.50, AUD: 54.00,
+    CHF: 94.00, HKD: 10.70, MYR: 18.00, THB: 2.35, SAR: 22.25,
+    KRW: 0.062, BRL: 16.50, ZAR: 4.50, MXN: 4.90, NZD: 49.00,
+  };
+
+  const CURRENCY_OPTIONS = [
+    { code: 'USD', label: 'USD - US Dollar' },
+    { code: 'EUR', label: 'EUR - Euro' },
+    { code: 'GBP', label: 'GBP - British Pound' },
+    { code: 'INR', label: 'INR - Indian Rupee' },
+    { code: 'AED', label: 'AED - UAE Dirham' },
+    { code: 'SGD', label: 'SGD - Singapore Dollar' },
+    { code: 'JPY', label: 'JPY - Japanese Yen' },
+    { code: 'CNY', label: 'CNY - Chinese Yuan' },
+    { code: 'CAD', label: 'CAD - Canadian Dollar' },
+    { code: 'AUD', label: 'AUD - Australian Dollar' },
+    { code: 'CHF', label: 'CHF - Swiss Franc' },
+    { code: 'HKD', label: 'HKD - Hong Kong Dollar' },
+    { code: 'MYR', label: 'MYR - Malaysian Ringgit' },
+    { code: 'THB', label: 'THB - Thai Baht' },
+    { code: 'SAR', label: 'SAR - Saudi Riyal' },
+    { code: 'KRW', label: 'KRW - South Korean Won' },
+    { code: 'BRL', label: 'BRL - Brazilian Real' },
+    { code: 'ZAR', label: 'ZAR - South African Rand' },
+    { code: 'MXN', label: 'MXN - Mexican Peso' },
+    { code: 'NZD', label: 'NZD - New Zealand Dollar' },
+  ];
+
+  const getCrossRate = (from, to) => {
+    if (from === to) return 1;
+    const fromRate = exchangeRates[from] || FALLBACK_RATES[from] || 1;
+    const toRate = exchangeRates[to] || FALLBACK_RATES[to] || 1;
+    return toRate === 0 ? 1 : fromRate / toRate;
   };
 
   // Fetch live exchange rates from API
@@ -64,14 +92,10 @@ function NewShipment() {
         setExchangeRates(response.data.rates);
         setIsLiveRate(response.data.is_live);
         setRatesLastUpdated(response.data.last_updated);
-        // Update current exchange rate based on selected currency
-        const rate = response.data.rates[formData.currency] || FALLBACK_RATES[formData.currency] || 83.50;
-        setExchangeRate(rate);
       }
     } catch (err) {
       console.error('Failed to fetch exchange rates:', err);
       setExchangeRates(FALLBACK_RATES);
-      setExchangeRate(FALLBACK_RATES[formData.currency] || 83.50);
       setIsLiveRate(false);
     } finally {
       setRatesLoading(false);
@@ -120,10 +144,13 @@ function NewShipment() {
     }).catch(() => {});
   }, [step, token]);
 
-  // Update exchange rate when currency changes
-  const updateExchangeRate = (currency) => {
-    const rate = exchangeRates[currency] || FALLBACK_RATES[currency] || 83.50;
-    setExchangeRate(rate);
+  const updateTargetOnInvoiceCurrencyChange = (newInvoiceCurrency) => {
+    setTargetCurrency(prev => {
+      if (prev === newInvoiceCurrency) {
+        return newInvoiceCurrency === 'USD' ? 'EUR' : 'USD';
+      }
+      return prev;
+    });
   };
 
   // Step A: File Upload
@@ -192,7 +219,7 @@ function NewShipment() {
 
       // Update exchange rate to match the currency detected from the PO
       if (extractedData.currency) {
-        updateExchangeRate(extractedData.currency);
+        updateTargetOnInvoiceCurrencyChange(extractedData.currency);
       }
 
       // Guarantee hs_code is set: use item-level code, then fall back to doc tariff_code
@@ -240,9 +267,8 @@ function NewShipment() {
       [name]: newValue
     });
     
-    // Update exchange rate when currency changes
     if (name === 'currency') {
-      updateExchangeRate(value);
+      updateTargetOnInvoiceCurrencyChange(value);
     }
   };
 
@@ -404,6 +430,7 @@ function NewShipment() {
       shipmentFormData.append('total_packages', formData.total_packages);
       shipmentFormData.append('package_type', formData.package_type);
       shipmentFormData.append('include_inr_column', formData.include_inr_column ? 'true' : 'false');
+      shipmentFormData.append('secondary_currency', targetCurrency);
       shipmentFormData.append('items', JSON.stringify(formData.items));
       if (invoiceNumber) shipmentFormData.append('invoice_number_override', invoiceNumber);
 
@@ -820,12 +847,9 @@ function NewShipment() {
                       required
                       data-testid="currency-select"
                     >
-                      <option value="USD">USD - US Dollar</option>
-                      <option value="EUR">EUR - Euro</option>
-                      <option value="GBP">GBP - British Pound</option>
-                      <option value="INR">INR - Indian Rupee</option>
-                      <option value="AED">AED - UAE Dirham</option>
-                      <option value="SGD">SGD - Singapore Dollar</option>
+                      {CURRENCY_OPTIONS.map(c => (
+                        <option key={c.code} value={c.code}>{c.label}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -988,8 +1012,8 @@ function NewShipment() {
                         <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase min-w-[60px]">W (cm)</th>
                         <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase min-w-[60px]">H (cm)</th>
                         <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase min-w-[110px]">Amount ({formData.currency})</th>
-                        {formData.currency !== 'INR' && (
-                          <th className="px-2 py-3 text-left text-xs font-medium text-green-700 uppercase bg-green-50 min-w-[110px]">Amount (₹ INR)</th>
+                        {formData.currency !== targetCurrency && (
+                          <th className="px-2 py-3 text-left text-xs font-medium text-green-700 uppercase bg-green-50 min-w-[110px]">Amount ({targetCurrency})</th>
                         )}
                         <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase min-w-[70px]">Action</th>
                       </tr>
@@ -1134,9 +1158,9 @@ function NewShipment() {
                               <div className="text-xs text-red-600 mt-1">Math Mismatch!</div>
                             )}
                           </td>
-                          {formData.currency !== 'INR' && (
-                            <td className="px-2 py-3 font-medium text-sm bg-green-50 text-green-700" data-testid={`item-inr-${index}`}>
-                              {(item.total_amount * exchangeRate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {formData.currency !== targetCurrency && (
+                            <td className="px-2 py-3 font-medium text-sm bg-green-50 text-green-700" data-testid={`item-secondary-${index}`}>
+                              {(item.total_amount * getCrossRate(formData.currency, targetCurrency)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </td>
                           )}
                           <td className="px-2 py-3">
@@ -1155,53 +1179,68 @@ function NewShipment() {
                   </table>
                 </div>
 
-                {/* INR Total and Include Option */}
-                {formData.currency !== 'INR' && formData.items.length > 0 && (
+                {/* Currency Conversion Panel */}
+                {formData.items.length > 0 && (
                   <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="text-sm text-green-800">
-                          <strong>Total in INR (₹):</strong> {(formData.items.reduce((sum, item) => sum + item.total_amount, 0) * exchangeRate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <p className="text-xs text-green-600">
-                            Exchange Rate: 1 {formData.currency} = ₹{exchangeRate.toFixed(2)}
-                          </p>
-                          {isLiveRate ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-200 text-green-800">
-                              🟢 Live Rate
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-200 text-yellow-800">
-                              ⚠️ Fallback Rate
-                            </span>
-                          )}
-                          <button
-                            type="button"
-                            onClick={fetchExchangeRates}
-                            disabled={ratesLoading}
-                            className="text-xs text-blue-600 hover:text-blue-800 underline disabled:opacity-50"
-                          >
-                            {ratesLoading ? 'Refreshing...' : 'Refresh'}
-                          </button>
-                        </div>
-                        {ratesLastUpdated && (
-                          <p className="text-xs text-gray-500 mt-1">
-                            Last updated: {new Date(ratesLastUpdated).toLocaleString()}
-                          </p>
-                        )}
+                    <div className="flex flex-col space-y-3">
+                      <div className="flex items-center space-x-3">
+                        <span className="text-sm font-medium text-green-800">Show totals in:</span>
+                        <select
+                          value={targetCurrency}
+                          onChange={(e) => setTargetCurrency(e.target.value)}
+                          className="text-sm border border-green-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-green-500"
+                        >
+                          {CURRENCY_OPTIONS.filter(c => c.code !== formData.currency).map(c => (
+                            <option key={c.code} value={c.code}>{c.label}</option>
+                          ))}
+                        </select>
                       </div>
-                      <label className="flex items-center space-x-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          name="include_inr_column"
-                          checked={formData.include_inr_column}
-                          onChange={handleFormChange}
-                          className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
-                          data-testid="include-inr-checkbox"
-                        />
-                        <span className="text-sm font-medium text-green-800">Include INR column in PDF</span>
-                      </label>
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="text-sm text-green-800">
+                            <strong>Total in {targetCurrency}:</strong>{' '}
+                            {(formData.items.reduce((sum, item) => sum + item.total_amount, 0) * getCrossRate(formData.currency, targetCurrency)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <p className="text-xs text-green-600">
+                              Rate: 1 {formData.currency} = {getCrossRate(formData.currency, targetCurrency).toFixed(4)} {targetCurrency}
+                            </p>
+                            {isLiveRate ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-200 text-green-800">
+                                Live
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-200 text-yellow-800">
+                                Fallback
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={fetchExchangeRates}
+                              disabled={ratesLoading}
+                              className="text-xs text-blue-600 hover:text-blue-800 underline disabled:opacity-50"
+                            >
+                              {ratesLoading ? 'Refreshing...' : 'Refresh'}
+                            </button>
+                          </div>
+                          {ratesLastUpdated && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              Last updated: {new Date(ratesLastUpdated).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                        <label className="flex items-center space-x-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            name="include_inr_column"
+                            checked={formData.include_inr_column}
+                            onChange={handleFormChange}
+                            className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                            data-testid="include-secondary-checkbox"
+                          />
+                          <span className="text-sm font-medium text-green-800">Include {targetCurrency} column in PDF</span>
+                        </label>
+                      </div>
                     </div>
                   </div>
                 )}

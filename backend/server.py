@@ -125,6 +125,22 @@ FALLBACK_RATES_TO_INR = {
     "JPY": 0.56,
     "CAD": 61.50,
     "AUD": 54.00,
+    "CNY": 11.50,
+    "CHF": 94.00,
+    "HKD": 10.70,
+    "MYR": 18.00,
+    "THB": 2.35,
+    "SAR": 22.25,
+    "KRW": 0.062,
+    "BRL": 16.50,
+    "ZAR": 4.50,
+    "MXN": 4.90,
+    "IDR": 0.0054,
+    "TRY": 2.55,
+    "SEK": 7.90,
+    "NOK": 7.80,
+    "DKK": 12.10,
+    "NZD": 49.00,
 }
 
 # Cache for exchange rates (to avoid too many API calls)
@@ -176,6 +192,15 @@ def get_inr_rate_sync(currency: str, rates: dict = None) -> float:
     if rates:
         return rates.get(currency.upper(), FALLBACK_RATES_TO_INR.get(currency.upper(), 83.50))
     return FALLBACK_RATES_TO_INR.get(currency.upper(), 83.50)
+
+def get_cross_rate(from_currency: str, to_currency: str, rates: dict = None) -> float:
+    """Get cross rate: how many units of to_currency per 1 unit of from_currency"""
+    r = rates or FALLBACK_RATES_TO_INR
+    from_rate = r.get(from_currency.upper(), FALLBACK_RATES_TO_INR.get(from_currency.upper(), 1.0))
+    to_rate = r.get(to_currency.upper(), FALLBACK_RATES_TO_INR.get(to_currency.upper(), 1.0))
+    if to_rate == 0:
+        return 1.0
+    return round(from_rate / to_rate, 6)
 
 # Helper Functions
 def create_token(user_id: str) -> str:
@@ -421,6 +446,7 @@ async def create_shipment(
     total_packages: int = Form(1),
     package_type: str = Form("BOXES"),
     include_inr_column: str = Form("false"),
+    secondary_currency: str = Form("INR"),
     consignee: str = Form(""),
     notify_party: str = Form(""),
     payment_terms: str = Form(""),
@@ -452,6 +478,7 @@ async def create_shipment(
         "total_packages": total_packages,
         "package_type": package_type,
         "include_inr_column": include_inr_bool,
+        "secondary_currency": secondary_currency.upper(),
         "consignee": consignee,
         "notify_party": notify_party,
         "payment_terms": payment_terms,
@@ -487,7 +514,8 @@ async def update_shipment(
     payment_terms: str = Form(""),
     marks_and_numbers: str = Form(""),
     tariff_code: str = Form(""),
-    include_inr_column: str = Form("false")
+    include_inr_column: str = Form("false"),
+    secondary_currency: str = Form("INR")
 ):
     items_list = json.loads(items)
     include_inr_bool = include_inr_column.lower() in ('true', '1', 'yes')
@@ -511,6 +539,7 @@ async def update_shipment(
             "marks_and_numbers": marks_and_numbers,
             "tariff_code": tariff_code,
             "include_inr_column": include_inr_bool,
+            "secondary_currency": secondary_currency.upper(),
             "items": items_list,
             "status": status,
             "updated_at": datetime.utcnow()
@@ -1073,13 +1102,14 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
     # Table header style
     table_header_style = ParagraphStyle('TableHeader', parent=styles['Normal'], fontSize=9, textColor=colors.whitesmoke)
     
-    # Check if INR column should be included
-    include_inr = shipment.get('include_inr_column', False) and currency != 'INR'
-    # Get INR rate from cache or fallback
-    inr_rate = get_inr_rate_sync(currency, exchange_rate_cache.get("rates")) if include_inr else 1
-    
+    # Check if secondary currency column should be included
+    secondary_currency = shipment.get('secondary_currency', 'INR').upper()
+    include_secondary = shipment.get('include_inr_column', False) and currency != secondary_currency
+    # Get cross rate from invoice currency to secondary currency
+    cross_rate = get_cross_rate(currency, secondary_currency, exchange_rate_cache.get("rates") or {}) if include_secondary else 1
+
     # Create items table with repeatRows for header on each page
-    if include_inr:
+    if include_secondary:
         items_data = [[
             Paragraph('<b>Description</b>', table_header_style),
             Paragraph('<b>HS Code</b>', table_header_style),
@@ -1087,13 +1117,13 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
             Paragraph('<b>Unit</b>', table_header_style),
             Paragraph(f'<b>Rate ({currency})</b>', table_header_style),
             Paragraph(f'<b>Amount ({currency})</b>', table_header_style),
-            Paragraph('<b>Amount (INR)</b>', table_header_style)
+            Paragraph(f'<b>Amount ({secondary_currency})</b>', table_header_style)
         ]]
 
-        total_inr = 0
+        total_secondary = 0
         for item in shipment['items']:
-            inr_amount = item['total_amount'] * inr_rate
-            total_inr += inr_amount
+            secondary_amount = item['total_amount'] * cross_rate
+            total_secondary += secondary_amount
             items_data.append([
                 item['description'],
                 item.get('hs_code', ''),
@@ -1101,7 +1131,7 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
                 item.get('unit_of_measure', ''),
                 f"{item['unit_price']:.2f}",
                 f"{item['total_amount']:,.2f}",
-                f"{inr_amount:,.2f}"
+                f"{secondary_amount:,.2f}"
             ])
 
         items_table = Table(items_data, colWidths=[2.1*inch, 0.8*inch, 0.5*inch, 0.5*inch, 0.9*inch, 1.0*inch, 1.7*inch], repeatRows=1)
@@ -1148,10 +1178,10 @@ async def generate_invoice_pdf(shipment_id: str, user_id: str = Depends(verify_t
     summary_right_text += f"<b>Total Gross Weight:</b> {total_gross_weight:.2f} kg<br/>"
     summary_right_text += f"<b>TOTAL ({currency}):</b> {total_amount:,.2f}"
     
-    if include_inr:
-        total_inr = total_amount * inr_rate
-        summary_right_text += f"<br/><b>TOTAL (INR):</b> {total_inr:,.2f}"
-        summary_right_text += f"<br/><i style='font-size:8'>Exchange Rate: 1 {currency} = INR {inr_rate:.2f}</i>"
+    if include_secondary:
+        total_sec = total_amount * cross_rate
+        summary_right_text += f"<br/><b>TOTAL ({secondary_currency}):</b> {total_sec:,.2f}"
+        summary_right_text += f"<br/><i style='font-size:8'>Exchange Rate: 1 {currency} = {secondary_currency} {cross_rate:.4f}</i>"
     
     summary_data = [[
         Paragraph(f"<b>Total Packages:</b> {total_packages} {package_type}", styles['Normal']),
