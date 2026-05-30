@@ -286,7 +286,7 @@ async def signup(email: str = Form(...), password: str = Form(...)):
     })
     
     token = create_token(user_id)
-    return {"token": token, "user_id": user_id, "email": email}
+    return {"token": token, "user_id": user_id, "email": email, "is_pro_member": True}
 
 @app.post("/api/auth/login")
 async def login(email: str = Form(...), password: str = Form(...)):
@@ -302,7 +302,7 @@ async def login(email: str = Form(...), password: str = Form(...)):
         "token": token, 
         "user_id": user["_id"], 
         "email": user["email"],
-        "is_pro_member": user.get("is_pro_member", False)
+        "is_pro_member": True
     }
 
 # Get User Info (including pro status)
@@ -311,11 +311,11 @@ async def get_user_info(user_id: str = Depends(verify_token)):
     user = users_collection.find_one({"_id": user_id})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     return {
         "user_id": user["_id"],
         "email": user["email"],
-        "is_pro_member": user.get("is_pro_member", False),
+        "is_pro_member": True,
         "created_at": user["created_at"].isoformat()
     }
 
